@@ -21,7 +21,7 @@ enum ElementLocator {
         "AXDisclosureTriangle", "AXIncrementor", "AXSwitch", "AXToggle", "AXColorWell", "AXDateField",
     ]
 
-    static var isTrusted: Bool { AXIsProcessTrusted() }
+    static var isTrusted: Bool { AXIsProcessTrusted() && Feature.accessibility.isOn }
 
     static func requestTrust() {
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary

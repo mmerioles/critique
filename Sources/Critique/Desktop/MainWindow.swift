@@ -20,6 +20,7 @@ final class MainWindow: NSWindowController, NSWindowDelegate {
         window.setFrameAutosaveName("CritiqueMainWindow")
         super.init(window: window)
         window.delegate = self
+        ScreenCapture.keepWindows.insert(CGWindowID(window.windowNumber))
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -151,12 +152,22 @@ struct KeyCap: View {
     }
 }
 
+/// Critique's mark: a magnifying glass with a red dot where you're pointing.
+/// Drawn as vectors so it stays crisp at any size and matches the website.
 struct LogoImage: View {
+    var color: Color = Theme.ink
+
     var body: some View {
-        if let url = Bundle.main.url(forResource: "Logo", withExtension: "png"), let image = NSImage(contentsOf: url) {
-            Image(nsImage: image).resizable().interpolation(.high).aspectRatio(contentMode: .fit)
-        } else {
-            Image(systemName: "magnifyingglass").resizable().aspectRatio(contentMode: .fit)
+        Canvas { context, size in
+            let u = min(size.width, size.height) / 32
+            let lens = CGRect(x: 4.5 * u, y: 4.5 * u, width: 17 * u, height: 17 * u)
+            context.stroke(Path(ellipseIn: lens), with: .color(color), lineWidth: 3 * u)
+            var handle = Path()
+            handle.move(to: CGPoint(x: 19.4 * u, y: 19.4 * u))
+            handle.addLine(to: CGPoint(x: 27 * u, y: 27 * u))
+            context.stroke(handle, with: .color(color), style: StrokeStyle(lineWidth: 3.4 * u, lineCap: .round))
+            context.fill(Path(ellipseIn: CGRect(x: 10.4 * u, y: 10.4 * u, width: 5.2 * u, height: 5.2 * u)), with: .color(Theme.red))
         }
+        .aspectRatio(1, contentMode: .fit)
     }
 }

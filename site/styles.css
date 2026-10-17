@@ -99,7 +99,7 @@ pre {
   border-radius: 14px;
 }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 20px; }
-.brand img { width: 30px; height: 30px; }
+.brand .mark { width: 26px; height: 26px; color: var(--ink); }
 .nav-links { display: flex; align-items: center; gap: 26px; color: var(--muted); font-size: 16px; }
 .nav-links a:not(.button):hover { color: var(--ink); }
 .nav-links .button { padding: 9px 16px; font-size: 15px; }
@@ -248,7 +248,7 @@ main { padding: 0 24px; }
 .footer-cols a { display: block; padding: 4px 0; font-size: 16px; }
 .footer-cols a:hover { color: var(--muted); }
 .wordmark { display: flex; align-items: center; gap: 3vw; margin: 80px 0 40px; }
-.wordmark img { width: clamp(90px, 14vw, 170px); }
+.wordmark .mark { width: clamp(80px, 12vw, 160px); height: auto; color: var(--ink); }
 .wordmark span { font: 600 clamp(80px, 16vw, 200px)/1 var(--sans); letter-spacing: -0.04em; }
 .footer-bottom { display: flex; justify-content: space-between; color: var(--muted); font-size: 14px; }
 

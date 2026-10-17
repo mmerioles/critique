@@ -10,14 +10,23 @@ enum ScreenCapture {
         return NSScreen.screens.first { NSMouseInRect(point, $0.frame, false) } ?? NSScreen.main ?? NSScreen.screens[0]
     }
 
-    /// Full-resolution screenshot of one display, with Critique's own windows left out.
+    /// Critique windows that *should* appear in screenshots (the main window), so
+    /// you can critique Critique itself. The pill and red overlays never do.
+    nonisolated(unsafe) static var keepWindows: Set<CGWindowID> = []
+
+    /// Full-resolution screenshot of one display, without Critique's pill and overlays.
     static func capture(_ screen: NSScreen) async throws -> CGImage {
+        guard Feature.screen.isOn else {
+            throw NSError(domain: "Critique", code: 5, userInfo: [NSLocalizedDescriptionKey: "Screen recording is turned off in Critique"])
+        }
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
         guard let display = content.displays.first(where: { $0.displayID == screen.displayID }) else {
             throw NSError(domain: "Critique", code: 1, userInfo: [NSLocalizedDescriptionKey: "Display not found"])
         }
-        let ourselves = content.applications.filter { $0.processID == getpid() }
-        let filter = SCContentFilter(display: display, excludingApplications: ourselves, exceptingWindows: [])
+        let overlays = content.windows.filter {
+            $0.owningApplication?.processID == getpid() && !keepWindows.contains($0.windowID)
+        }
+        let filter = SCContentFilter(display: display, excludingWindows: overlays)
         let config = SCStreamConfiguration()
         config.width = Int(screen.frame.width * screen.backingScaleFactor)
         config.height = Int(screen.frame.height * screen.backingScaleFactor)
@@ -34,7 +43,8 @@ enum ScreenCapture {
         let frontPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
         for info in list { // ordered front to back
             guard (info[kCGWindowLayer as String] as? Int) == 0,
-                  let pid = info[kCGWindowOwnerPID as String] as? pid_t, pid != getpid(),
+                  let pid = info[kCGWindowOwnerPID as String] as? pid_t,
+                  pid != getpid() || keepWindows.contains(info[kCGWindowNumber as String] as? CGWindowID ?? 0),
                   let boundsDict = info[kCGWindowBounds as String] as? NSDictionary,
                   let bounds = CGRect(dictionaryRepresentation: boundsDict) else { continue }
             let matches = point.map { bounds.contains($0) } ?? (pid == frontPID)

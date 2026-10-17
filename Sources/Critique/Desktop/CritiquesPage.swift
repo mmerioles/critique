@@ -115,7 +115,7 @@ private struct Banner: View {
                         .foregroundStyle(.white.opacity(0.75))
                 }
                 Spacer()
-                LogoImage().frame(width: 96, height: 96).opacity(0.95)
+                LogoImage(color: .white).frame(width: 84, height: 84)
             }
             .foregroundStyle(.white)
             .padding(28)

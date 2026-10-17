@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="docs/logo.png" width="128" alt="Critique logo">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/logo-dark.svg">
+    <img src="docs/logo.svg" width="96" alt="Critique logo">
+  </picture>
 </p>
 
 <h1 align="center">Critique</h1>

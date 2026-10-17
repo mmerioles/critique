@@ -38,7 +38,9 @@ final class CritiqueController {
         pointer.onGesture = { [weak self] gesture, p, since in self?.capture(gesture, at: p, since: since) }
         pointer.onHover = { [weak self] p in self?.hovered(p) }
 
-        trigger = RightOptionTap { [weak self] in self?.toggle() }
+        trigger = RightOptionTap { [weak self] in
+            if Feature.doubleTap.isOn { self?.toggle() }
+        }
         // Backup trigger that works even without Input Monitoring permission.
         HotKeys.shared.register(kVK_Space, controlKey | optionKey) { [weak self] in self?.toggle() }
     }
@@ -73,7 +75,7 @@ final class CritiqueController {
 
         // Check screen access up front (macOS's permission check can be stale,
         // so try a capture) — screenshots themselves are only taken when you draw.
-        Task {
+        if Feature.screen.isOn { Task {
             do {
                 _ = try await ScreenCapture.capture(screen)
             } catch {
@@ -82,18 +84,18 @@ final class CritiqueController {
                 ScreenCapture.requestPermission()
                 notice("Critique can't see your screen. Turn it on in System Settings → Privacy & Security → Screen Recording, then reopen Critique.", seconds: 7)
             }
-        }
-        Task {
+        } }
+        if Feature.screen.isOn { Task {
             do {
-                try await recorder.start(screen, excluding: [bar.windowNumber])
+                try await recorder.start(screen, excluding: [bar.windowNumber], microphone: Feature.voice.isOn)
             } catch {
                 log("screen recording unavailable: \(error.localizedDescription)")
             }
             if !session.isActive { await recorder.discard() }
-        }
+        } }
         Task {
             log("session started — speech permission \(SFSpeechRecognizer.authorizationStatus().rawValue), microphone \(AVCaptureDevice.authorizationStatus(for: .audio).rawValue) (3 = allowed, 0 = not asked yet)")
-            let allowed = await Dictation.authorize()
+            let allowed = Feature.voice.isOn ? await Dictation.authorize() : false
             guard session.mode == .listening else { return }
             do {
                 guard allowed else { throw NSError(domain: "Critique", code: 4) }

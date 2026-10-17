@@ -40,7 +40,7 @@ final class AgentHandoff {
     /// Brings your agent's app forward and types `line` into its prompt. Calls back
     /// with the app's name, or nil if Claude Code wasn't found in focus.
     func deliver(line: String, completion: @escaping (String?) -> Void) {
-        guard isEnabled, AXIsProcessTrusted(),
+        guard isEnabled, AXIsProcessTrusted(), Feature.accessibility.isOn,
               let app = lastAgentApp, !app.isTerminated, let url = app.bundleURL else { return completion(nil) }
         let config = NSWorkspace.OpenConfiguration()
         config.activates = true

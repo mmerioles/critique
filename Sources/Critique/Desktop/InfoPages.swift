@@ -100,64 +100,97 @@ struct GuidePage: View {
     }
 }
 
-/// Live status of each macOS permission, with a button to fix any that are off.
+/// Each permission with an on/off switch. Off grays the row and Critique stops
+/// using it. On turns it back on and asks macOS for access if it's missing.
 struct PermissionsPage: View {
-    private struct Permission: Identifiable {
+    private struct Row: Identifiable {
+        let feature: Feature
         let name: String
         let why: String
         let pane: String
-        let isOn: () -> Bool
+        let granted: () -> Bool
+        let request: () -> Void
         var id: String { name }
     }
 
-    private let permissions: [Permission] = [
-        Permission(name: "Screen Recording", why: "See your screen and take screenshots", pane: "Privacy_ScreenCapture",
-                   isOn: { CGPreflightScreenCaptureAccess() }),
-        Permission(name: "Microphone", why: "Hear what you say", pane: "Privacy_Microphone",
-                   isOn: { AVCaptureDevice.authorizationStatus(for: .audio) == .authorized }),
-        Permission(name: "Speech Recognition", why: "Turn your voice into text, on your Mac", pane: "Privacy_SpeechRecognition",
-                   isOn: { SFSpeechRecognizer.authorizationStatus() == .authorized }),
-        Permission(name: "Input Monitoring", why: "Notice the right ⌥ double-tap", pane: "Privacy_ListenEvent",
-                   isOn: { CGPreflightListenEventAccess() }),
-        Permission(name: "Accessibility", why: "Know which button or link you're on, and type into Claude Code", pane: "Privacy_Accessibility",
-                   isOn: { AXIsProcessTrusted() }),
+    private let rows: [Row] = [
+        Row(feature: .screen, name: "Screen Recording", why: "Record your screen and take screenshots when you draw",
+            pane: "Privacy_ScreenCapture", granted: { CGPreflightScreenCaptureAccess() },
+            request: { CGRequestScreenCaptureAccess() }),
+        Row(feature: .voice, name: "Microphone & Speech", why: "Hear what you say and turn it into text, on your Mac",
+            pane: "Privacy_Microphone",
+            granted: { AVCaptureDevice.authorizationStatus(for: .audio) == .authorized && SFSpeechRecognizer.authorizationStatus() == .authorized },
+            request: { Task { _ = await Dictation.authorize() } }),
+        Row(feature: .doubleTap, name: "Input Monitoring", why: "Start and send with a right ⌥ double-tap (⌃⌥Space always works)",
+            pane: "Privacy_ListenEvent", granted: { CGPreflightListenEventAccess() },
+            request: { CGRequestListenEventAccess() }),
+        Row(feature: .accessibility, name: "Accessibility", why: "Name the buttons you touch, and type into Claude Code for you",
+            pane: "Privacy_Accessibility", granted: { AXIsProcessTrusted() },
+            request: { ElementLocator.requestTrust() }),
     ]
 
-    @State private var status: [String: Bool] = [:]
+    @State private var on: [Feature: Bool] = [:]
+    @State private var granted: [Feature: Bool] = [:]
     private let refresh = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        PageScaffold(title: "Permissions", subtitle: "Critique needs these to work. Everything stays on your Mac.") {
+        PageScaffold(title: "Permissions", subtitle: "Turn off anything you don't want Critique to use.") {
             RowList {
-                ForEach(Array(permissions.enumerated()), id: \.element.id) { index, permission in
+                ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
                     if index > 0 { Divider().overlay(Theme.border) }
-                    HStack(spacing: 14) {
-                        Image(systemName: status[permission.name] == true ? "checkmark.circle.fill" : "exclamationmark.circle")
-                            .font(.system(size: 18))
-                            .foregroundStyle(status[permission.name] == true ? Color.green : Theme.red)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(permission.name).font(.system(size: 14, weight: .medium))
-                            Text(permission.why).font(.system(size: 12)).foregroundStyle(Theme.secondary)
-                        }
-                        Spacer()
-                        if status[permission.name] != true {
-                            Button("Allow") {
-                                NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?\(permission.pane)")!)
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 14)
+                    permissionRow(row)
                 }
             }
-            Text("Allowed something but it still shows as off? Quit and reopen Critique.")
+            Text("Switched on but still needs access? Allow Critique in System Settings, then quit and reopen it.")
                 .font(.system(size: 12)).foregroundStyle(Theme.tertiary)
         }
         .onAppear(perform: check)
         .onReceive(refresh) { _ in check() }
     }
 
+    private func permissionRow(_ row: Row) -> some View {
+        let isOn = on[row.feature] ?? true
+        let hasAccess = granted[row.feature] ?? false
+        return HStack(spacing: 14) {
+            Image(systemName: !isOn ? "circle.slash" : hasAccess ? "checkmark.circle.fill" : "exclamationmark.circle")
+                .font(.system(size: 18))
+                .foregroundStyle(!isOn ? Theme.tertiary : hasAccess ? Color.green : Theme.red)
+                .frame(width: 22)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(row.name).font(.system(size: 14, weight: .medium))
+                Text(isOn && !hasAccess ? "Needs access — click Allow" : row.why)
+                    .font(.system(size: 12)).foregroundStyle(Theme.secondary)
+            }
+            Spacer()
+            if isOn && !hasAccess {
+                Button("Allow") { allow(row) }
+            }
+            Toggle("", isOn: Binding(get: { isOn }, set: { set(row, $0) }))
+                .toggleStyle(.switch)
+                .labelsHidden()
+                .tint(Theme.red)
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
+        .opacity(isOn ? 1 : 0.45) // off rows go gray
+        .animation(.easeOut(duration: 0.15), value: isOn)
+    }
+
+    private func set(_ row: Row, _ value: Bool) {
+        row.feature.set(value)
+        on[row.feature] = value
+        if value && !row.granted() { allow(row) }
+    }
+
+    private func allow(_ row: Row) {
+        row.request()
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?\(row.pane)")!)
+    }
+
     private func check() {
-        status = Dictionary(uniqueKeysWithValues: permissions.map { ($0.name, $0.isOn()) })
+        for row in rows {
+            on[row.feature] = row.feature.isOn
+            granted[row.feature] = row.granted()
+        }
     }
 }

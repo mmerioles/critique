@@ -10,7 +10,7 @@ final class ScreenRecorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegat
     private(set) var startedAt: Date?
 
     /// `excluding` are window numbers to leave out of the video (Critique's bar).
-    func start(_ screen: NSScreen, excluding windowNumbers: [Int]) async throws {
+    func start(_ screen: NSScreen, excluding windowNumbers: [Int], microphone: Bool) async throws {
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
         guard let display = content.displays.first(where: { $0.displayID == screen.displayID }) else { return }
         let hidden = content.windows.filter { windowNumbers.contains(Int($0.windowID)) }
@@ -21,7 +21,7 @@ final class ScreenRecorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegat
         config.height = Int(screen.frame.height * min(screen.backingScaleFactor, 1.5))
         config.minimumFrameInterval = CMTime(value: 1, timescale: 30)
         config.showsCursor = true
-        config.captureMicrophone = true
+        config.captureMicrophone = microphone
 
         let dir = Inbox.root.deletingLastPathComponent().appendingPathComponent("recording")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
