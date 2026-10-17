@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>dev.uxflow.app</string>
+    <key>CFBundleName</key>
+    <string>UX Flow</string>
+    <key>CFBundleDisplayName</key>
+    <string>UX Flow</string>
+    <key>CFBundleExecutable</key>
+    <string>UXFlow</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>15.0</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>UX Flow listens while you describe what you see, so your coding agent gets your feedback in your own words.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>UX Flow turns your spoken feedback into text for your coding agent.</string>
+</dict>
+</plist>
