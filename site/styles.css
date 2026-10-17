@@ -97,7 +97,6 @@ main { padding: 0 24px; }
 .grid { display: grid; gap: 20px; }
 .grid.two { grid-template-columns: repeat(2, 1fr); }
 .grid.three { grid-template-columns: repeat(3, 1fr); }
-.grid.four { grid-template-columns: repeat(4, 1fr); }
 .card {
   background: var(--paper);
   border: 1px solid var(--line);
@@ -106,11 +105,16 @@ main { padding: 0 24px; }
 }
 .card p { color: var(--muted); font-size: 16px; }
 .card .button { margin-top: 20px; }
+.icon {
+  display: flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; margin-bottom: 20px;
+  border-radius: 12px; background: #fdeceb;
+}
 .icon svg {
-  width: 28px; height: 28px; margin-bottom: 18px;
+  width: 22px; height: 22px;
   fill: none; stroke: var(--red); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
 }
-.icon svg .fill { fill: var(--red); stroke: none; }
+.apple { width: 17px; height: 17px; fill: currentColor; margin-top: -2px; }
 
 /* Hero */
 .hero { max-width: 1040px; margin: 0 auto; padding: 120px 0 0; text-align: center; }
@@ -183,16 +187,6 @@ main { padding: 0 24px; }
 .pill .wave i:nth-child(3n) { height: 11px; }
 .pill .time { font-size: 13px; color: #aaa; font-variant-numeric: tabular-nums; }
 
-/* Steps */
-.steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-.steps li { display: flex; gap: 16px; padding: 26px; background: var(--paper); border: 1px solid var(--line); border-radius: 16px; }
-.steps p { color: var(--muted); font-size: 16px; }
-.num {
-  flex: none; width: 32px; height: 32px; border-radius: 50%;
-  border: 1.5px solid var(--ink);
-  font: 400 20px/30px var(--serif); text-align: center;
-}
-
 /* Install */
 .connect { margin-top: 20px; }
 .connect pre { white-space: pre-wrap; word-break: break-all; }
@@ -244,7 +238,7 @@ main { padding: 0 24px; }
 
 /* Small screens */
 @media (max-width: 860px) {
-  .grid.four, .grid.three, .grid.two, .steps, .footer-cols { grid-template-columns: 1fr; }
+  .grid.three, .grid.two, .footer-cols { grid-template-columns: 1fr; }
   .nav-links a:not(.button) { display: none; }
   .caption { position: static; margin: 16px auto 0; }
   .window-body { padding: 30px 24px 90px; }
