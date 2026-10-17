@@ -24,23 +24,16 @@ final class CritiqueController {
     private var sessionKeys: [UInt32] = []
     private var hideWork: DispatchWorkItem?
     private var sending = false
-    private var lastTalkedAt = Date.distantPast
     private var lastLevelAt = Date.distantPast
     private let maxShots = 30
 
     init() {
         dictation.onSpeech = { [weak self] text, words in
             guard let self else { return }
-            // "Talking" means words are actually being recognized, not just noise.
-            if !text.isEmpty, text != self.session.liveSpeech { self.lastTalkedAt = Date() }
             self.session.updateSpeech(text, words: words)
         }
         dictation.onSegmentEnd = { [weak self] in self?.session.commitSpeech() }
         dictation.onLevel = { [weak self] level in self?.heard(level) }
-        pointer.isTalking = { [weak self] in
-            guard let self else { return false }
-            return self.session.mode == .listening && Date().timeIntervalSince(self.lastTalkedAt) < 2.5
-        }
         pointer.ignore = { [weak self] p in self?.bar.frame.contains(p) ?? false }
         pointer.onGesture = { [weak self] gesture, p, since in self?.capture(gesture, at: p, since: since) }
         pointer.onHover = { [weak self] p in self?.hovered(p) }
@@ -78,22 +71,17 @@ final class CritiqueController {
         pointer.start()
         if let app = NSWorkspace.shared.frontmostApplication { ElementLocator.wakeUp(app.processIdentifier) }
 
-        // The screen as it was when you started. macOS's permission check can be
-        // stale, so just try — and only complain if it fails.
+        // Check screen access up front (macOS's permission check can be stale,
+        // so try a capture) — screenshots themselves are only taken when you draw.
         Task {
-            let image: CGImage
             do {
-                image = try await ScreenCapture.capture(screen)
+                _ = try await ScreenCapture.capture(screen)
             } catch {
                 guard session.isActive else { return }
                 cancel()
                 ScreenCapture.requestPermission()
                 notice("Critique can't see your screen. Turn it on in System Settings → Privacy & Security → Screen Recording, then reopen Critique.", seconds: 7)
-                return
             }
-            guard session.isActive else { return }
-            let context = ScreenCapture.windowContext(at: nil)
-            session.addShot { Shot(number: $0, kind: .screen, image: image, app: context.app, window: context.title) }
         }
         Task {
             do {
@@ -151,7 +139,7 @@ final class CritiqueController {
     private func save(video: URL?) {
         session.finalizeText()
         let notes = session.committed.trimmingCharacters(in: .whitespacesAndNewlines)
-        let pointedAtSomething = session.shots.contains { $0.kind != .screen }
+        let pointedAtSomething = !session.shots.isEmpty
         guard !notes.isEmpty || pointedAtSomething else {
             if let video { try? FileManager.default.removeItem(at: video) }
             sending = false
@@ -172,6 +160,7 @@ final class CritiqueController {
         sending = false
         switch result {
         case .success(let (dir, record)):
+            NotificationCenter.default.post(name: CritiqueStore.didSave, object: nil)
             let pb = NSPasteboard.general
             pb.clearContents()
             pb.setString(record.markdown(in: dir), forType: .string)
@@ -222,61 +211,40 @@ final class CritiqueController {
         }
     }
 
-    /// You pointed at, drew on, or clicked something: mark it on screen and screenshot it.
+    /// A click is logged for the timeline. A drawing gets a whole-screen screenshot
+    /// with your stroke on it — the only time Critique takes screenshots.
     private func capture(_ gesture: PointerTracker.Gesture, at p: NSPoint, since: Date) {
         guard session.isActive else { return }
         let screen = NSScreen.screens.first { NSMouseInRect(p, $0.frame, false) } ?? ScreenCapture.screenUnderMouse()
         let maxArea = screen.frame.width * screen.frame.height * 0.15
-        let context = ScreenCapture.windowContext(at: Self.topLeft(p))
 
-        // A held ` with barely any movement is just pointing.
-        var stroke: [NSPoint]?
-        if case .drawing(let points) = gesture {
-            let bounds = Self.bounds(of: points)
-            if bounds.width > 10 || bounds.height > 10 { stroke = points }
-        }
-        let isClick: Bool = { if case .click = gesture { return true } else { return false } }()
-
-        Task {
-            let element = await ElementLocator.element(at: Self.topLeft(p), maxArea: maxArea)
-            if isClick, let element { session.log(.click, element.label, at: since) }
-            guard session.shots.count < maxShots else { return }
-
-            let kind: Shot.Kind
-            var box: CGRect? // global Cocoa coordinates
-            var inside: [String] = []
-            if let stroke {
-                kind = .drawing
-                let drawn = Self.bounds(of: stroke).insetBy(dx: -12, dy: -12)
-                box = drawn
-                inside = await ElementLocator.elements(in: Self.topLeft(drawn), maxArea: maxArea).map(\.label)
-            } else {
-                kind = isClick ? .click : .pointer
-                box = element.map { Self.cocoa($0.frame).insetBy(dx: -4, dy: -4) }
-                if let box, !box.intersection(screen.frame).isEmpty { pointer.markup.box(box) } else { pointer.markup.pulse() }
+        switch gesture {
+        case .click:
+            Task {
+                if let element = await ElementLocator.element(at: Self.topLeft(p), maxArea: maxArea), session.isActive {
+                    session.log(.click, element.label, at: since)
+                }
             }
-            box = box?.intersection(screen.frame)
-
-            // After a click, wait a beat so the screenshot shows what the click did.
-            if isClick { try? await Task.sleep(for: .milliseconds(350)) }
-            guard let image = try? await ScreenCapture.capture(screen), session.isActive else { return }
-
-            let scale = CGFloat(image.width) / screen.frame.width
-            func px(_ q: NSPoint) -> CGPoint {
-                CGPoint(x: (q.x - screen.frame.minX) * scale, y: (screen.frame.maxY - q.y) * scale)
+        case .drawing(let stroke):
+            let drawn = Self.bounds(of: stroke)
+            guard drawn.width > 10 || drawn.height > 10 else { return } // a tap, not a drawing
+            let context = ScreenCapture.windowContext(at: Self.topLeft(NSPoint(x: drawn.midX, y: drawn.midY)))
+            Task {
+                guard session.shots.count < maxShots else { return }
+                let inside = await ElementLocator.elements(in: Self.topLeft(drawn.insetBy(dx: -12, dy: -12)), maxArea: maxArea).map(\.label)
+                guard let image = try? await ScreenCapture.capture(screen), session.isActive else { return }
+                let scale = CGFloat(image.width) / screen.frame.width
+                func px(_ q: NSPoint) -> CGPoint {
+                    CGPoint(x: (q.x - screen.frame.minX) * scale, y: (screen.frame.maxY - q.y) * scale)
+                }
+                let box = drawn.insetBy(dx: -12, dy: -12).intersection(screen.frame)
+                let region = CGRect(x: (box.minX - screen.frame.minX) * scale, y: (screen.frame.maxY - box.maxY) * scale,
+                                    width: box.width * scale, height: box.height * scale)
+                session.addShot({
+                    Shot(number: $0, kind: .drawing, image: image, region: region,
+                         app: context.app, window: context.title, stroke: stroke.map(px), inside: inside)
+                }, at: since)
             }
-            let regionPx = box.flatMap { b -> CGRect? in
-                b.isEmpty ? nil : CGRect(x: (b.minX - screen.frame.minX) * scale, y: (screen.frame.maxY - b.maxY) * scale,
-                                         width: b.width * scale, height: b.height * scale)
-            }
-            session.addShot({
-                Shot(number: $0, kind: kind, image: image,
-                     region: regionPx,
-                     point: regionPx == nil ? px(p) : nil,
-                     app: context.app, window: context.title,
-                     element: stroke == nil ? element?.label : nil,
-                     stroke: stroke?.map(px), inside: inside)
-            }, at: since)
         }
     }
 

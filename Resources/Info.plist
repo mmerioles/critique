@@ -18,8 +18,8 @@
     <string>1</string>
     <key>LSMinimumSystemVersion</key>
     <string>15.0</string>
-    <key>LSUIElement</key>
-    <true/>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>Critique listens while you describe what you see, so your coding agent gets your feedback in your own words.</string>
     <key>NSSpeechRecognitionUsageDescription</key>

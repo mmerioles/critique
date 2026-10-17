@@ -41,27 +41,13 @@ enum FeedbackWriter {
             record.at = max(0, shot.time.timeIntervalSince(input.clockStart))
             record.said = said(around: shot, in: input)
             record.inside = shot.inside.isEmpty ? nil : shot.inside
+            // The whole screen, with your stroke drawn on it.
             var image = shot.image
-            var focus: CGRect?
             if let stroke = shot.stroke, stroke.count > 1 {
                 image = annotate(image, stroke: stroke, number: shot.number) ?? image
-                if let region = shot.region {
-                    record.region = [Int(region.minX), Int(region.minY), Int(region.width), Int(region.height)]
-                    focus = region
-                }
-            } else if let region = shot.region {
-                image = annotate(image, region: region, number: shot.number) ?? image
-                record.region = [Int(region.minX), Int(region.minY), Int(region.width), Int(region.height)]
-                focus = region
-            } else if let point = shot.point {
-                image = annotate(image, point: point, number: shot.number) ?? image
-                record.pointer = [Int(point.x), Int(point.y)]
-                let w = CGFloat(image.width) / 5, h = CGFloat(image.height) / 5
-                focus = CGRect(x: point.x - w / 2, y: point.y - h / 2, width: w, height: h)
             }
-            if let focus, let zoom = zoom(image, on: focus) {
-                record.zoomFile = "\(shot.number)-\(shot.kind.rawValue)-zoom.png"
-                try writePNG(zoom, to: dir.appendingPathComponent(record.zoomFile!))
+            if let region = shot.region {
+                record.region = [Int(region.minX), Int(region.minY), Int(region.width), Int(region.height)]
             }
             try writePNG(image, to: dir.appendingPathComponent(record.file))
             shots.append(record)
@@ -184,56 +170,6 @@ enum FeedbackWriter {
         return text.isEmpty ? nil : text
     }
 
-    /// Dims everything outside the region, outlines it, and adds a numbered badge.
-    static func annotate(_ image: CGImage, region: CGRect, number: Int) -> CGImage? {
-        let w = image.width, h = image.height
-        guard let ctx = context(for: image) else { return nil }
-        let full = CGRect(x: 0, y: 0, width: w, height: h)
-
-        let unit = max(CGFloat(w) / 1000, 1)
-        let rect = CGRect(x: region.minX, y: CGFloat(h) - region.maxY, width: region.width, height: region.height)
-        let outline = CGPath(roundedRect: rect, cornerWidth: 6 * unit, cornerHeight: 6 * unit, transform: nil)
-
-        ctx.addRect(full)
-        ctx.addPath(outline)
-        ctx.setFillColor(CGColor(gray: 0, alpha: 0.3))
-        ctx.fillPath(using: .evenOdd)
-
-        ctx.addPath(outline)
-        ctx.setStrokeColor(accent)
-        ctx.setLineWidth(3 * unit)
-        ctx.strokePath()
-
-        drawBadge(number, at: CGPoint(x: rect.minX, y: rect.maxY), unit: unit, in: ctx, size: CGSize(width: w, height: h))
-        return ctx.makeImage()
-    }
-
-    /// Marks where the cursor was: a soft spotlight, a ring, and a numbered badge.
-    static func annotate(_ image: CGImage, point: CGPoint, number: Int) -> CGImage? {
-        let w = image.width, h = image.height
-        guard let ctx = context(for: image) else { return nil }
-        let unit = max(CGFloat(w) / 1000, 1)
-        let center = CGPoint(x: point.x, y: CGFloat(h) - point.y)
-
-        let spot = CGRect(x: center.x - 90 * unit, y: center.y - 90 * unit, width: 180 * unit, height: 180 * unit)
-        ctx.addRect(CGRect(x: 0, y: 0, width: w, height: h))
-        ctx.addEllipse(in: spot)
-        ctx.setFillColor(CGColor(gray: 0, alpha: 0.22))
-        ctx.fillPath(using: .evenOdd)
-
-        let r = 18 * unit
-        let ring = CGRect(x: center.x - r, y: center.y - r, width: 2 * r, height: 2 * r)
-        ctx.setFillColor(accent.copy(alpha: 0.18)!)
-        ctx.fillEllipse(in: ring)
-        ctx.setStrokeColor(accent)
-        ctx.setLineWidth(3 * unit)
-        ctx.strokeEllipse(in: ring)
-
-        drawBadge(number, at: CGPoint(x: center.x + r * 0.9, y: center.y + r * 0.9), unit: unit, in: ctx,
-                  size: CGSize(width: w, height: h))
-        return ctx.makeImage()
-    }
-
     /// Draws the stroke you drew with ` onto the screenshot.
     static func annotate(_ image: CGImage, stroke: [CGPoint], number: Int) -> CGImage? {
         let h = CGFloat(image.height)
@@ -278,14 +214,6 @@ enum FeedbackWriter {
         let b = CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)
         ctx.textPosition = CGPoint(x: center.x - b.width / 2 - b.minX, y: center.y - b.height / 2 - b.minY)
         CTLineDraw(line, ctx)
-    }
-
-    /// A close-up of the highlighted area with some surrounding context.
-    static func zoom(_ image: CGImage, on region: CGRect) -> CGImage? {
-        let pad = max(region.width, region.height) * 0.25 + 40
-        let crop = region.insetBy(dx: -pad, dy: -pad)
-            .intersection(CGRect(x: 0, y: 0, width: image.width, height: image.height)).integral
-        return image.cropping(to: crop)
     }
 
     static func writeJPEG(_ image: CGImage, to url: URL) throws {

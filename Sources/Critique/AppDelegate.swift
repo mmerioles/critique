@@ -4,13 +4,18 @@ import AppKit
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var critique: CritiqueController!
     private var statusItem: NSStatusItem!
+    private var store: CritiqueStore!
+    private var window: MainWindow!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         critique = CritiqueController()
+        store = CritiqueStore()
+        window = MainWindow(store: store, handoff: critique.handoff)
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        statusItem.button?.image = NSImage(systemSymbolName: "bubble.and.pencil", accessibilityDescription: "Critique")
+        statusItem.button?.image = NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: "Critique")
 
         let menu = NSMenu()
+        menu.addItem(item("Open Critique", #selector(openWindow)))
         menu.addItem(item("Give Feedback  (double-tap right ⌥)", #selector(giveFeedback)))
         menu.addItem(.separator())
         let paste = item("Paste Into Agent After Sending", #selector(togglePaste))
@@ -26,6 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(item("Quit Critique", #selector(quit)))
         statusItem.menu = menu
 
+        window.show()
         if !ScreenCapture.hasPermission { ScreenCapture.requestPermission() }
         // Lets Critique box the exact button/text you point at.
         if !ElementLocator.isTrusted { ElementLocator.requestTrust() }
@@ -42,6 +48,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func giveFeedback() { critique.toggle() }
+
+    @objc private func openWindow() { window.show() }
+
+    /// Clicking the Dock icon brings the window back.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        window.show()
+        return true
+    }
 
     @objc private func togglePaste(_ sender: NSMenuItem) {
         critique.handoff.isEnabled.toggle()

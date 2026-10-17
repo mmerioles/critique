@@ -2,15 +2,13 @@ import AppKit
 import QuartzCore
 
 /// Treats your cursor like a finger. While a session runs it notices:
-///  - **rest**: the cursor sits on something while you're talking
-///  - **click**: you click something
-///  - **drawing**: you hold ` and move the cursor to draw on the screen
-///  - **hover**: the cursor settles somewhere new (used to log what you hover over)
+///  - **drawing**: you hold ` and move the cursor to mark up the screen
+///  - **click**: you click something (logged, no screenshot)
+///  - **hover**: the cursor settles somewhere new (logged, no screenshot)
 /// and shows a red ring around the cursor so it's obvious where you're pointing.
 @MainActor
 final class PointerTracker {
     enum Gesture {
-        case rest
         case click
         /// The stroke you drew, in global Cocoa coordinates.
         case drawing([NSPoint])
@@ -20,8 +18,6 @@ final class PointerTracker {
     var onGesture: (Gesture, NSPoint, Date) -> Void = { _, _, _ in }
     /// The cursor settled at a new spot (global Cocoa coordinates).
     var onHover: (NSPoint) -> Void = { _ in }
-    /// Resting only counts while you're talking, so a parked cursor doesn't fire.
-    var isTalking: () -> Bool = { true }
     /// Areas to ignore, such as Critique's own bar.
     var ignore: (NSPoint) -> Bool = { _ in false }
 
@@ -32,24 +28,17 @@ final class PointerTracker {
 
     private var anchor = NSPoint.zero
     private var anchorSince = Date()
-    private var firedHere = false
     private var hoveredHere = false
-    private var lastShot: (point: NSPoint, at: Date)?
     private var stroke: [NSPoint] = []
     private var strokeStart = Date()
 
-    private let stillRadius: CGFloat = 12      // wobble allowed while "resting"
+    private let stillRadius: CGFloat = 12      // wobble allowed while hovering
     private let hoverTime: TimeInterval = 0.2  // settle this long to count as hovering
-    private let restTime: TimeInterval = 0.55  // rest this long (while talking) to point at something
-    private let sameSpot: CGFloat = 70         // don't re-capture the same spot
-    private let minGap: TimeInterval = 1.2     // at most one capture per this many seconds
 
     func start() {
         anchor = NSEvent.mouseLocation
         anchorSince = Date()
-        firedHere = true // ignore wherever the cursor happens to be at the start
         hoveredHere = false
-        lastShot = nil
         isDrawing = false
         markup.show(cursor: anchor)
         timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60, repeats: true) { [weak self] _ in
@@ -85,7 +74,6 @@ final class PointerTracker {
         let p = NSEvent.mouseLocation
         stroke.append(p)
         markup.endStroke()
-        firedHere = true
         anchor = p
         report(.drawing(stroke), at: p, since: strokeStart)
     }
@@ -106,7 +94,6 @@ final class PointerTracker {
         if hypot(p.x - anchor.x, p.y - anchor.y) > stillRadius {
             anchor = p
             anchorSince = now
-            firedHere = false
             hoveredHere = false
             return
         }
@@ -115,25 +102,16 @@ final class PointerTracker {
             hoveredHere = true
             onHover(p)
         }
-        guard !firedHere, still >= restTime, isTalking(), !ignore(p) else { return }
-        firedHere = true
-        if let last = lastShot {
-            if hypot(p.x - last.point.x, p.y - last.point.y) < sameSpot { return }
-            if now.timeIntervalSince(last.at) < minGap { firedHere = false; return } // try again shortly
-        }
-        report(.rest, at: p, since: anchorSince)
     }
 
     private func clicked() {
         let p = NSEvent.mouseLocation
         guard timer != nil, !isDrawing, !ignore(p) else { return }
-        firedHere = true
         anchor = p
         report(.click, at: p, since: Date())
     }
 
     private func report(_ gesture: Gesture, at p: NSPoint, since: Date) {
-        lastShot = (p, Date())
         onGesture(gesture, p, since)
     }
 }

@@ -79,7 +79,6 @@ final class Session: ObservableObject {
 
     // Speech still being recognized, plus markers waiting to be placed in it.
     @Published private var speech = ""
-    var liveSpeech: String { speech }
     private var words: [WordTime] = []
     private var markers: [Marker] = []
 
@@ -141,7 +140,7 @@ final class Session: ObservableObject {
     /// re-placing each [#n] marker by when you pointed.
     func replaceTranscript(with words: [SpokenWord]) {
         spoken = words.sorted { $0.time < $1.time }
-        var pending = shots.filter { $0.number > 1 }.sorted { $0.time < $1.time }
+        var pending = shots.filter { $0.kind != .screen }.sorted { $0.time < $1.time }
         var parts: [String] = []
         for word in spoken {
             while let next = pending.first, next.time <= word.time {

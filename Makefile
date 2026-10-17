@@ -15,6 +15,9 @@ app:
 	mkdir -p $(APP)/Contents/MacOS
 	cp .build/release/Critique $(APP)/Contents/MacOS/Critique
 	cp Resources/Info.plist $(APP)/Contents/Info.plist
+	mkdir -p $(APP)/Contents/Resources
+	cp Resources/AppIcon.icns $(APP)/Contents/Resources/AppIcon.icns
+	cp docs/logo.png $(APP)/Contents/Resources/Logo.png
 	codesign --force --sign "$(SIGN_ID)" $(APP)
 
 # Build and launch
