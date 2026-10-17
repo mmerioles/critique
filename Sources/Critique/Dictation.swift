@@ -167,6 +167,9 @@ final class Dictation {
         }
         let a = words(old), b = words(new)
         guard a.count >= 2, !b.isEmpty, b.count < a.count else { return false }
+        // Mostly the same words → the recognizer just corrected itself.
+        let shared = b.filter(Set(a).contains).count
+        if Double(shared) >= Double(b.count) * 0.7 && b.count >= 3 { return false }
         return Array(a.prefix(2)) != Array(b.prefix(2)) && a.first != b.first
     }
 
