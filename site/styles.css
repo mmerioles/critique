@@ -70,7 +70,20 @@ pre {
 .button-dark:hover { background: #000; }
 .button-outline { background: transparent; }
 .button-outline:hover { background: var(--soft); }
-.button-large { padding: 15px 28px; font-size: 18px; margin-top: 34px; }
+/* Download: one simple pill with the Apple logo, version underneath */
+.download {
+  display: inline-flex; align-items: center; gap: 9px;
+  margin-top: 34px;
+  padding: 13px 28px;
+  border-radius: 999px;
+  background: var(--ink); color: var(--cream);
+  font-size: 17px; font-weight: 500;
+}
+.download:hover { background: #000; }
+.download .apple { width: 16px; height: 16px; }
+.download-small { margin: 0; padding: 9px 18px; font-size: 15px; }
+.card .download { margin-top: 20px; }
+.version { margin-top: 12px; font-size: 14px; color: var(--muted); }
 
 /* Nav */
 .nav-wrap { position: sticky; top: 16px; z-index: 10; padding: 0 16px; }
@@ -94,6 +107,9 @@ pre {
 /* Layout */
 main { padding: 0 24px; }
 .section { max-width: 1040px; margin: 0 auto; padding: 110px 0 0; }
+.section > .eyebrow, .section > h2 { text-align: center; }
+#features .card { text-align: center; padding: 32px 26px; }
+#features .icon { margin-left: auto; margin-right: auto; }
 .grid { display: grid; gap: 20px; }
 .grid.two { grid-template-columns: repeat(2, 1fr); }
 .grid.three { grid-template-columns: repeat(3, 1fr); }
@@ -114,7 +130,7 @@ main { padding: 0 24px; }
   width: 22px; height: 22px;
   fill: none; stroke: var(--red); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
 }
-.apple { width: 17px; height: 17px; fill: currentColor; margin-top: -2px; }
+.apple { flex: none; fill: currentColor; margin-top: -2px; }
 
 /* Hero */
 .hero { max-width: 1040px; margin: 0 auto; padding: 120px 0 0; text-align: center; }
