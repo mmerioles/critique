@@ -44,13 +44,11 @@ struct GuidePage: View {
         PageScaffold(title: "Guide", subtitle: "Everything Critique does, on one page.") {
             section("Keys")
             RowList {
-                row(keys: ["right ⌥", "right ⌥"], "Start a critique, and send it")
+                keyRow([.option, .option], "Double-tap right option to start. Do it again to send.")
                 Divider().overlay(Theme.border)
-                row(keys: ["hold `"], "Draw on the screen — this takes a screenshot")
+                keyRow([.backtick], "Hold and move the mouse to draw. Each drawing takes a screenshot.")
                 Divider().overlay(Theme.border)
-                row(keys: ["esc"], "Cancel")
-                Divider().overlay(Theme.border)
-                row(keys: ["⌃⌥Space"], "Backup for the double-tap")
+                keyRow([.escape], "Cancel")
             }
 
             section("What your agent gets")
@@ -66,7 +64,7 @@ struct GuidePage: View {
 
             section("Tips")
             VStack(alignment: .leading, spacing: 10) {
-                tip("Say “this” while you draw — your words and the drawing are linked.")
+                tip("Say “this” while you draw. Your words and the drawing are linked.")
                 tip("Keep Claude Code as the active terminal tab so Critique can type into it.")
             }
         }
@@ -76,15 +74,23 @@ struct GuidePage: View {
         Text(title.uppercased()).font(.system(size: 12, weight: .medium)).kerning(1.2).foregroundStyle(Theme.secondary)
     }
 
-    private func row(keys: [String] = [], icon: String? = nil, _ text: String) -> some View {
+    private func keyRow(_ keys: [KeyboardKey], _ text: String) -> some View {
         HStack(spacing: 14) {
-            HStack(spacing: 4) {
-                if let icon {
-                    Image(systemName: icon).foregroundStyle(Theme.secondary).frame(width: 20)
-                }
-                ForEach(keys, id: \.self) { KeyCap($0) }
+            HStack(spacing: 6) {
+                ForEach(Array(keys.enumerated()), id: \.offset) { $0.element }
             }
-            .frame(width: 150, alignment: .leading)
+            .frame(width: 210, alignment: .leading)
+            Text(text).font(.system(size: 14))
+            Spacer()
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 12)
+    }
+
+    private func row(icon: String, _ text: String) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: icon).foregroundStyle(Theme.secondary)
+                .frame(width: 210, alignment: .leading)
             Text(text).font(.system(size: 14))
             Spacer()
         }
@@ -121,7 +127,7 @@ struct PermissionsPage: View {
             pane: "Privacy_Microphone",
             granted: { AVCaptureDevice.authorizationStatus(for: .audio) == .authorized && SFSpeechRecognizer.authorizationStatus() == .authorized },
             request: { Task { _ = await Dictation.authorize() } }),
-        Row(feature: .doubleTap, name: "Input Monitoring", why: "Start and send with a right ⌥ double-tap (⌃⌥Space always works)",
+        Row(feature: .doubleTap, name: "Input Monitoring", why: "Start and send with a right ⌥ double-tap",
             pane: "Privacy_ListenEvent", granted: { CGPreflightListenEventAccess() },
             request: { CGRequestListenEventAccess() }),
         Row(feature: .accessibility, name: "Accessibility", why: "Name the buttons you touch, and type into Claude Code for you",
@@ -192,5 +198,47 @@ struct PermissionsPage: View {
             on[row.feature] = row.feature.isOn
             granted[row.feature] = row.granted()
         }
+    }
+}
+
+/// Your account. There's no sign-in yet, so everything stays on this Mac.
+struct AccountPage: View {
+    private var name: String { (NSFullUserName().isEmpty ? NSUserName() : NSFullUserName()).capitalized }
+
+    var body: some View {
+        PageScaffold(title: "Account", subtitle: "Sign-in is coming soon. For now, everything stays on this Mac.") {
+            RowList {
+                HStack(spacing: 14) {
+                    Text(String(name.prefix(1)).uppercased())
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 46, height: 46)
+                        .background(Circle().fill(Theme.ink))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(name).font(.system(size: 15, weight: .medium))
+                        Text("Local account on this Mac").font(.system(size: 12)).foregroundStyle(Theme.secondary)
+                    }
+                    Spacer()
+                    Button("Sign in") {}.disabled(true).help("Coming soon")
+                }
+                .padding(18)
+                Divider().overlay(Theme.border)
+                detail("Plan", "Free")
+                Divider().overlay(Theme.border)
+                detail("Email", "Not signed in")
+                Divider().overlay(Theme.border)
+                detail("Critiques", "Saved on this Mac in ~/.critique")
+            }
+        }
+    }
+
+    private func detail(_ label: String, _ value: String) -> some View {
+        HStack {
+            Text(label).font(.system(size: 14)).frame(width: 120, alignment: .leading)
+            Text(value).font(.system(size: 14)).foregroundStyle(Theme.secondary)
+            Spacer()
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
     }
 }

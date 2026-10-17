@@ -1,7 +1,7 @@
 import AppKit
 
 /// After you send feedback, types a one-line pointer to it into Claude Code's
-/// prompt — without pressing Enter. You review and hit ⏎.
+/// prompt and presses Enter, so Claude Code starts on it right away.
 ///
 /// Safety: it only types into a window whose title shows Claude Code is running
 /// (Claude Code puts ✳ or a spinner in the terminal title), and only ever a single
@@ -51,7 +51,11 @@ final class AgentHandoff {
             // Never type into the wrong app or a plain shell.
             guard ready, Self.showsClaudeCode(app) else { return completion(nil) }
             Self.type(line.replacingOccurrences(of: "\n", with: " "))
-            completion(app.localizedName)
+            // Give the terminal a moment to take in the text before submitting it.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                Self.pressReturn()
+                completion(app.localizedName)
+            }
         }
     }
 
@@ -81,6 +85,13 @@ final class AgentHandoff {
 
     nonisolated private static func isAgentApp(_ app: NSRunningApplication) -> Bool {
         app.bundleIdentifier.map(agentApps.contains) ?? false
+    }
+
+    private static func pressReturn() {
+        let source = CGEventSource(stateID: .hidSystemState)
+        for down in [true, false] {
+            CGEvent(keyboardEventSource: source, virtualKey: 36, keyDown: down)?.post(tap: .cghidEventTap)
+        }
     }
 
     /// Types text as if from the keyboard (works with any keyboard layout).

@@ -39,7 +39,7 @@ On first launch, allow Critique in **System Settings → Privacy & Security**:
 | Permission | Why |
 |---|---|
 | Screen Recording | See your screen |
-| Input Monitoring | Notice the right ⌥ double-tap (`⌃⌥Space` works meanwhile) |
+| Input Monitoring | Notice the right ⌥ double-tap |
 | Accessibility | Box the exact button you point at |
 | Microphone + Speech Recognition | On-device dictation |
 
@@ -65,7 +65,7 @@ Your agent gets your words, a screen recording, marked-up screenshots, and a tim
 
 ## Getting feedback to your agent
 
-When you send, Critique types one line into Claude Code: `Implement my UX feedback from Critique: …/feedback.md`. Press **Enter**.
+When you send, Critique types one line into Claude Code and presses Enter for you: `Implement my UX feedback from Critique: …/feedback.md`.
 
 The feedback is also on your clipboard, saved in `~/.critique/inbox/`, and available over MCP:
 

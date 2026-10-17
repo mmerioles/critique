@@ -18,7 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(item("Open Critique", #selector(openWindow)))
         menu.addItem(item("Give Feedback  (double-tap right ⌥)", #selector(giveFeedback)))
         menu.addItem(.separator())
-        let paste = item("Paste Into Agent After Sending", #selector(togglePaste))
+        let paste = item("Send to Claude Code Automatically", #selector(togglePaste))
         paste.state = critique.handoff.isEnabled ? .on : .off
         menu.addItem(paste)
         menu.addItem(item("Copy Latest Feedback", #selector(copyLatest)))

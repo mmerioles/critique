@@ -38,17 +38,18 @@ struct ConnectPage: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Then ask your agent").font(.system(size: 12, weight: .medium)).kerning(1.2).foregroundStyle(Theme.secondary)
                 example("“Check my latest critique and fix it.”")
-                example("“Wait for my critique, then fix it.” — it starts as soon as you send.")
+                example("“Wait for my critique, then fix it.” It starts as soon as you send.")
             }
 
             Toggle(isOn: $pasteIntoAgent) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Type into Claude Code after sending").font(.system(size: 14))
-                    Text("Puts one line in Claude Code's prompt. You press Enter.")
+                    Text("Automatically send to Claude Code").font(.system(size: 14))
+                    Text("Types one line into Claude Code and presses Enter for you.")
                         .font(.system(size: 12)).foregroundStyle(Theme.secondary)
                 }
             }
             .toggleStyle(.switch)
+            .tint(Theme.red)
 
             Spacer()
         }

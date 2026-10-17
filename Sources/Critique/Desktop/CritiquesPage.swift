@@ -110,7 +110,7 @@ private struct Banner: View {
                 VStack(alignment: .leading, spacing: 10) {
                     (Text("Critique anything ") + Text("on your screen").italic())
                         .font(.system(size: 28, weight: .regular, design: .serif))
-                    Text("Double-tap right ⌥, then talk and point. Your agent gets the rest.")
+                    Text("Double-tap right option, then talk and point. Your agent gets the rest.")
                         .font(.system(size: 14))
                         .foregroundStyle(.white.opacity(0.75))
                 }

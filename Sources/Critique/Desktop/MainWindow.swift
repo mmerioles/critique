@@ -50,6 +50,8 @@ enum Page: String, CaseIterable, Identifiable {
     case guide = "Guide"
     case permissions = "Permissions"
     case connect = "Connect"
+    case account = "Account"
+    case storage = "Storage"
     var id: String { rawValue }
     var icon: String {
         switch self {
@@ -57,6 +59,8 @@ enum Page: String, CaseIterable, Identifiable {
         case .guide: "keyboard"
         case .permissions: "lock.shield"
         case .connect: "point.3.connected.trianglepath.dotted"
+        case .account: "person.crop.circle"
+        case .storage: "internaldrive"
         }
     }
 }
@@ -76,6 +80,8 @@ struct RootView: View {
                 case .guide: GuidePage()
                 case .permissions: PermissionsPage()
                 case .connect: ConnectPage()
+                case .account: AccountPage()
+                case .storage: StoragePage(store: store)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -107,9 +113,12 @@ struct Sidebar: View {
 
             ForEach(Page.allCases) { item in
                 Button { page = item } label: {
-                    Label(item.rawValue, systemImage: item.icon)
-                        .font(.system(size: 14))
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    HStack(spacing: 10) {
+                        Image(systemName: item.icon).frame(width: 20)
+                        Text(item.rawValue)
+                    }
+                    .font(.system(size: 14))
+                    .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 8)
                         .background(RoundedRectangle(cornerRadius: 8).fill(page == item ? Theme.selected : .clear))
@@ -120,35 +129,63 @@ struct Sidebar: View {
 
             Spacer()
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .center, spacing: 10) {
                 Text("Start a critique").font(.system(size: 12, weight: .semibold))
-                HStack(spacing: 4) {
-                    KeyCap("right ⌥")
-                    Text("×2").font(.system(size: 11)).foregroundStyle(Theme.secondary)
+                HStack(spacing: 6) {
+                    KeyboardKey.option
+                    Text("× 2").font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.secondary)
                 }
-                Text("Talk and point. Hold ` to draw.")
+                Text("Double-tap right option, then talk. Hold ` to draw.")
                     .font(.system(size: 11)).foregroundStyle(Theme.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 14)
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity, alignment: .center)
             .background(RoundedRectangle(cornerRadius: 10).fill(Theme.panel))
             .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Theme.border))
-            .padding(.bottom, 16)
+            .padding(.bottom, 10)
         }
         .padding(.horizontal, 12)
     }
 }
 
-struct KeyCap: View {
-    let key: String
-    init(_ key: String) { self.key = key }
+/// Looks like a key on a Mac keyboard: symbol in the top corner, name at the bottom.
+struct KeyboardKey: View {
+    let name: String
+    var symbol: String? = nil
+    var width: CGFloat = 50
+
+    static let option = KeyboardKey(name: "option", symbol: "⌥")
+    static let control = KeyboardKey(name: "control", symbol: "⌃", width: 54)
+    static let space = KeyboardKey(name: "space", width: 86)
+    static let escape = KeyboardKey(name: "esc")
+    static let backtick = KeyboardKey(name: "`")
 
     var body: some View {
-        Text(key)
-            .font(.system(size: 11, weight: .medium, design: .rounded))
-            .padding(.horizontal, 6).padding(.vertical, 2)
-            .background(RoundedRectangle(cornerRadius: 5).fill(Theme.sidebar))
-            .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(Theme.border))
+        ZStack {
+            // A darker edge under the key gives it a little depth, like a real keycap.
+            RoundedRectangle(cornerRadius: 7).fill(Theme.border).offset(y: 2)
+            RoundedRectangle(cornerRadius: 7).fill(Theme.panel)
+            RoundedRectangle(cornerRadius: 7).strokeBorder(Theme.border)
+            if name.count == 1 {
+                Text(name).font(.system(size: 17, weight: .medium))
+            } else {
+                VStack(alignment: .trailing, spacing: 0) {
+                    Text(symbol ?? " ").font(.system(size: 11))
+                    Spacer(minLength: 0)
+                    Text(name).font(.system(size: 9.5, weight: .medium))
+                }
+                .padding(.horizontal, 6)
+                .padding(.vertical, 5)
+                .frame(maxWidth: .infinity, alignment: symbol == nil ? .center : .trailing)
+            }
+        }
+        .foregroundStyle(Theme.ink)
+        .frame(width: width, height: 38)
+        .padding(.bottom, 2)
+        .accessibilityLabel(name)
     }
 }
 

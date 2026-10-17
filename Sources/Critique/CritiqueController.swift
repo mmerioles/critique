@@ -203,7 +203,7 @@ final class CritiqueController {
                 guard let self else { return }
                 self.sending = false
                 if let app {
-                    self.notice(nil, sent: "In \(app) — press ⏎ to implement", seconds: 2.4)
+                    self.notice(nil, sent: "Sent to Claude Code in \(app)", seconds: 2.4)
                 } else {
                     self.notice(nil, sent: "\(summary) · copied — paste it into Claude Code (⌘V)", seconds: 3.5)
                 }

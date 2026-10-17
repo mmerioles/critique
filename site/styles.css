@@ -237,18 +237,9 @@ main { padding: 0 24px; }
   background: transparent;
   border: 1.5px solid var(--line);
   border-radius: 20px;
-  padding: 40px 30px 30px;
+  padding: 32px 30px 30px;
 }
 .plan-featured { border-color: var(--ink); }
-.tag {
-  position: absolute; top: -16px; left: 50%;
-  transform: translateX(-50%) rotate(-4deg);
-  padding: 4px 16px; border-radius: 10px;
-  font-family: var(--serif); font-size: 22px;
-}
-.tag-red { background: var(--red); color: #fff; }
-.tag-dark { background: var(--ink); color: var(--cream); transform: translateX(-50%) rotate(3deg); }
-.tag-cream { background: #f1e3c4; color: var(--ink); transform: translateX(-50%) rotate(-2deg); }
 .price { font: 400 52px/1.1 var(--serif); margin: 4px 0 24px; }
 .price span { font-size: 0.6em; }
 .plan .button { width: 100%; justify-content: center; }
@@ -279,8 +270,16 @@ main { padding: 0 24px; }
 @media (max-width: 860px) {
   .grid.three, .grid.two, .footer-cols { grid-template-columns: 1fr; }
   .nav-links a:not(.button) { display: none; }
-  .caption { position: static; margin: 16px auto 0; }
-  .window-body { padding: 30px 24px 90px; }
-  .mock-button { padding: 20px 40px; }
-  .pricing { gap: 40px; }
+  /* Stack the demo: window, then what was said, then the pill. Nothing overlaps. */
+  .demo { margin-top: 56px; }
+  .window-body { padding: 28px 24px 40px; }
+  .mock-line.wide { width: 80%; }
+  .mock-line { width: 55%; }
+  .mock-button { padding: 18px 40px; font-size: 18px; }
+  .stroke { left: 8px; top: 76px; width: 220px; height: 100px; }
+  .badge { left: 14px; top: 70px; }
+  .caption { position: static; max-width: none; margin: 16px 0 0; }
+  .pill { position: static; transform: none; width: fit-content; margin: 16px auto 0; }
+  .pricing { gap: 20px; }
+  .hero h1 br { display: none; }
 }
