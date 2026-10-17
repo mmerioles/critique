@@ -119,37 +119,63 @@ final class CritiqueController {
             guard let self else { return }
             Task {
                 let video = await self.recorder.stop()
-                await self.improveTranscript(from: video)
-                self.save(video: video)
+                self.session.finalizeText()
+                let live = self.session.committed
+                var audio: URL?
+                if let video {
+                    let url = video.deletingPathExtension().appendingPathExtension("m4a")
+                    if await Transcriber.exportAudio(from: video, to: url) { audio = url }
+                }
+                let engine = await self.improveTranscript(from: audio ?? video)
+                self.save(video: video, audio: audio, liveNotes: live, engine: engine)
             }
         }
     }
 
-    /// Live speech recognition can drop words; re-transcribe the recording and
-    /// use that if it caught more.
-    private func improveTranscript(from video: URL?) async {
-        guard let video, session.micAvailable, let start = recorder.startedAt else { return }
-        let words = await Dictation.transcribe(video)
+    /// Re-transcribes your voice from the recording — usually more accurate than
+    /// live dictation — and uses it unless it somehow caught much less.
+    /// Returns the engine used, if the recording's transcript was used.
+    private func improveTranscript(from url: URL?) async -> String? {
+        guard let url, session.micAvailable, let start = recorder.startedAt else { return nil }
+        guard let (words, engine) = await Transcriber.transcribe(url, hints: sessionHints()) else {
+            log("recording transcript: nothing")
+            return nil
+        }
         let live = session.spoken.count
-        log("recording transcript: \(words.count) words (live: \(live))")
-        guard words.count > live else { return }
+        log("recording transcript (\(engine)): \(words.count) words (live: \(live))")
+        guard Double(words.count) >= Double(live) * 0.7 else { return nil }
         session.replaceTranscript(with: words.map { SpokenWord(text: $0.text, time: start.addingTimeInterval($0.at)) })
+        return engine
     }
 
-    private func save(video: URL?) {
+    /// Names seen during the session (apps, windows, buttons) to help transcription.
+    private func sessionHints() -> [String] {
+        var hints = session.interactions.map(\.label) + session.shots.flatMap { [$0.app, $0.window].compactMap { $0 } + $0.inside }
+        // `button “Sign up”` → `Sign up`
+        hints = hints.map { label in
+            guard let open = label.firstIndex(of: "“"), let close = label.lastIndex(of: "”"), open < close else { return label }
+            return String(label[label.index(after: open)..<close])
+        }
+        return hints
+    }
+
+    private func save(video: URL?, audio: URL?, liveNotes: String, engine: String?) {
         session.finalizeText()
         let notes = session.committed.trimmingCharacters(in: .whitespacesAndNewlines)
         let pointedAtSomething = !session.shots.isEmpty
         guard !notes.isEmpty || pointedAtSomething else {
-            if let video { try? FileManager.default.removeItem(at: video) }
+            for url in [video, audio].compactMap({ $0 }) { try? FileManager.default.removeItem(at: url) }
             sending = false
             notice("Nothing to send — talk while you point at things.", seconds: 2.5)
             return
         }
-        let input = FeedbackWriter.Input(notes: notes, shots: session.shots, words: session.spoken,
+        var input = FeedbackWriter.Input(notes: notes, shots: session.shots, words: session.spoken,
                                          interactions: session.interactions,
                                          video: video, clockStart: recorder.startedAt ?? session.startedAt,
                                          duration: Date().timeIntervalSince(recorder.startedAt ?? session.startedAt))
+        input.audio = audio
+        input.liveNotes = liveNotes
+        input.engine = engine ?? "Apple live dictation"
         Task.detached(priority: .userInitiated) {
             let result = Result { try FeedbackWriter.write(input) }
             await MainActor.run { self.finishSending(result) }

@@ -19,6 +19,12 @@ enum FeedbackWriter {
         /// Time zero for the timeline (when the recording started).
         var clockStart = Date()
         var duration: TimeInterval = 0
+        /// Just your voice, for agents that want to listen again.
+        var audio: URL? = nil
+        /// What live dictation heard, kept alongside the main transcript.
+        var liveNotes: String? = nil
+        /// Which speech engine produced `notes`.
+        var engine: String? = nil
     }
 
     static func write(_ input: Input) throws -> (dir: URL, record: FeedbackRecord) {
@@ -63,9 +69,24 @@ enum FeedbackWriter {
                 videoURL = dest
             }
         }
+        if let audio = input.audio {
+            let dest = dir.appendingPathComponent("voice.m4a")
+            if (try? FileManager.default.moveItem(at: audio, to: dest)) != nil { record.audio = dest.lastPathComponent }
+        }
+        record.engine = input.engine
+        if let live = input.liveNotes?.trimmingCharacters(in: .whitespacesAndNewlines), !live.isEmpty,
+           Self.normalized(live) != Self.normalized(input.notes) {
+            record.liveNotes = live
+        }
         record.timeline = timeline(input, shots: shots, video: videoURL, dir: dir)
         try Inbox.save(record, in: dir)
         return (dir, record)
+    }
+
+    /// Lowercased words only, ignoring markers and punctuation, to compare transcripts.
+    private static func normalized(_ text: String) -> String {
+        text.replacingOccurrences(of: #"\[#\d+\]"#, with: " ", options: .regularExpression)
+            .lowercased().split { !$0.isLetter && !$0.isNumber }.joined(separator: " ")
     }
 
     static let accent = CGColor(red: 1, green: 0.23, blue: 0.19, alpha: 1)

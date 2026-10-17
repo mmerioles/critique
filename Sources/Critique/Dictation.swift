@@ -109,6 +109,7 @@ final class Dictation {
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
         request.addsPunctuation = true
+        request.contextualStrings = Transcriber.vocabulary
         if recognizer.supportsOnDeviceRecognition { request.requiresOnDeviceRecognition = true }
         box.request = request
         task = recognizer.recognitionTask(with: request) { [weak self] result, error in
@@ -175,11 +176,13 @@ final class Dictation {
 
     /// Transcribes a recording's audio afterwards — a second, more reliable pass.
     /// Word times are seconds from the start of the file.
-    static func transcribe(_ url: URL, timeout: TimeInterval = 25) async -> [(text: String, at: TimeInterval)] {
+    static func transcribe(_ url: URL, hints: [String] = Transcriber.vocabulary,
+                           timeout: TimeInterval = 25) async -> [(text: String, at: TimeInterval)] {
         guard SFSpeechRecognizer.authorizationStatus() == .authorized, let recognizer = SFSpeechRecognizer(),
               recognizer.isAvailable else { return [] }
         recognizer.queue = OperationQueue()
         let request = SFSpeechURLRecognitionRequest(url: url)
+        request.contextualStrings = hints
         request.requiresOnDeviceRecognition = recognizer.supportsOnDeviceRecognition
         request.addsPunctuation = true
         request.shouldReportPartialResults = false

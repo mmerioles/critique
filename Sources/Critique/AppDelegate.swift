@@ -32,6 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.menu = menu
 
         window.show()
+        Task { await Transcriber.prepare() } // get the speech model ready before the first critique
         if !ScreenCapture.hasPermission { ScreenCapture.requestPermission() }
         // Lets Critique box the exact button/text you point at.
         if !ElementLocator.isTrusted { ElementLocator.requestTrust() }

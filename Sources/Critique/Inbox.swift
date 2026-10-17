@@ -47,6 +47,12 @@ struct FeedbackRecord: Codable {
     var video: String?
     var duration: Double?
     var timeline: [Moment]?
+    /// Just the user's voice (file name in the same folder)
+    var audio: String?
+    /// What live dictation heard, when it differs from `notes`
+    var liveNotes: String?
+    /// Which speech engine produced `notes`
+    var engine: String?
 
     func markdown(in dir: URL) -> String {
         var md = "# UX feedback · \(Self.displayDate.string(from: createdAt))\n\n"
@@ -61,6 +67,16 @@ struct FeedbackRecord: Codable {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         md += words.isEmpty ? "_(Nothing was said — follow the timeline and screenshots.)_\n\n"
             : notes.split(separator: "\n", omittingEmptySubsequences: false).map { "> \($0)" }.joined(separator: "\n") + "\n\n"
+        if !words.isEmpty || audio != nil {
+            md += "_Speech-to-text can mishear words (e.g. “read me” = README, “whisper flow” = Wispr Flow). "
+            md += "Use context to work out what they meant"
+            if let audio { md += ", or listen to their voice: `\(dir.appendingPathComponent(audio).path)`" }
+            md += "._\n\n"
+        }
+        if let liveNotes {
+            md += "### Also heard live (a second transcript — compare if something seems off)\n\n"
+            md += liveNotes.split(separator: "\n", omittingEmptySubsequences: false).map { "> \($0)" }.joined(separator: "\n") + "\n\n"
+        }
 
         if let timeline, !timeline.isEmpty {
             md += "## Timeline\n\n"
