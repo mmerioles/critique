@@ -131,9 +131,21 @@ final class CritiqueController {
             guard let self else { return }
             Task {
                 let video = await self.recorder.stop()
+                await self.improveTranscript(from: video)
                 self.save(video: video)
             }
         }
+    }
+
+    /// Live speech recognition can drop words; re-transcribe the recording and
+    /// use that if it caught more.
+    private func improveTranscript(from video: URL?) async {
+        guard let video, session.micAvailable, let start = recorder.startedAt else { return }
+        let words = await Dictation.transcribe(video)
+        let live = session.spoken.count
+        log("recording transcript: \(words.count) words (live: \(live))")
+        guard words.count > live else { return }
+        session.replaceTranscript(with: words.map { SpokenWord(text: $0.text, time: start.addingTimeInterval($0.at)) })
     }
 
     private func save(video: URL?) {

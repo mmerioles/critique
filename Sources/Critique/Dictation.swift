@@ -1,5 +1,5 @@
 import AVFoundation
-import Speech
+@preconcurrency import Speech
 
 /// Live speech-to-text from the microphone, with a time for every word so
 /// screenshots can be matched to what you were saying when you took them.
@@ -22,6 +22,7 @@ final class Dictation {
     private var finishCompletion: (() -> Void)?
     private var segmentStart = Date()
     private var firstSeen: [Date] = []
+    private var lastText = ""
     private var peakLevel: Float = 0
     private var resultCount = 0
 
@@ -103,6 +104,7 @@ final class Dictation {
         let current = generation
         segmentStart = Date()
         firstSeen = []
+        lastText = ""
         log("speech segment started")
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
@@ -117,6 +119,15 @@ final class Dictation {
                 guard let self, self.generation == current, self.state != .idle else { return }
                 if let transcription {
                     self.resultCount += 1
+                    // After a pause the recognizer may start over with just the new
+                    // sentence. Keep what was said before instead of overwriting it.
+                    let text = transcription.formattedString
+                    if Self.startedOver(from: self.lastText, to: text) {
+                        log("speech restarted after a pause; keeping “\(self.lastText)”")
+                        self.onSegmentEnd()
+                        self.firstSeen = []
+                    }
+                    self.lastText = text
                     self.onSpeech(transcription.formattedString, self.wordTimes(transcription))
                 }
                 guard isFinal || error != nil else { return }
@@ -146,6 +157,58 @@ final class Dictation {
             WordTime(offset: segment.substringRange.location, length: segment.substringRange.length,
                      time: timed ? segmentStart.addingTimeInterval(segment.timestamp)
                                  : firstSeen[i].addingTimeInterval(-0.5))
+        }
+    }
+
+    /// True when `new` is a fresh sentence rather than a longer/revised version of `old`.
+    nonisolated static func startedOver(from old: String, to new: String) -> Bool {
+        func words(_ s: String) -> [String] {
+            s.lowercased().split { !$0.isLetter && !$0.isNumber && $0 != "'" }.map(String.init)
+        }
+        let a = words(old), b = words(new)
+        guard a.count >= 2, !b.isEmpty, b.count < a.count else { return false }
+        return Array(a.prefix(2)) != Array(b.prefix(2)) && a.first != b.first
+    }
+
+    /// Transcribes a recording's audio afterwards — a second, more reliable pass.
+    /// Word times are seconds from the start of the file.
+    static func transcribe(_ url: URL, timeout: TimeInterval = 25) async -> [(text: String, at: TimeInterval)] {
+        guard SFSpeechRecognizer.authorizationStatus() == .authorized, let recognizer = SFSpeechRecognizer(),
+              recognizer.isAvailable else { return [] }
+        recognizer.queue = OperationQueue()
+        let request = SFSpeechURLRecognitionRequest(url: url)
+        request.requiresOnDeviceRecognition = recognizer.supportsOnDeviceRecognition
+        request.addsPunctuation = true
+        request.shouldReportPartialResults = false
+        return await withCheckedContinuation { cont in
+            let lock = NSLock()
+            var words: [(text: String, at: TimeInterval)] = []
+            var finished = false
+            func finish() {
+                let done: [(text: String, at: TimeInterval)]? = lock.withLock {
+                    if finished { return nil }
+                    finished = true
+                    return words
+                }
+                if let done { cont.resume(returning: done) }
+            }
+            // Each result is one sentence; collect them all.
+            let task = recognizer.recognitionTask(with: request) { result, error in
+                if let result {
+                    let t = result.bestTranscription
+                    let ns = t.formattedString as NSString
+                    let sentence = t.segments.compactMap { seg -> (text: String, at: TimeInterval)? in
+                        guard seg.substringRange.location + seg.substringRange.length <= ns.length else { return nil }
+                        return (ns.substring(with: seg.substringRange), seg.timestamp)
+                    }
+                    lock.withLock { words += sentence }
+                }
+                if error != nil || result?.isFinal == true { finish() }
+            }
+            DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
+                task.cancel()
+                finish()
+            }
         }
     }
 

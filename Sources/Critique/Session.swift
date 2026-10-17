@@ -137,6 +137,26 @@ final class Session: ObservableObject {
         return shot.number
     }
 
+    /// Replaces what you said with a better transcript (from the recording),
+    /// re-placing each [#n] marker by when you pointed.
+    func replaceTranscript(with words: [SpokenWord]) {
+        spoken = words.sorted { $0.time < $1.time }
+        var pending = shots.filter { $0.number > 1 }.sorted { $0.time < $1.time }
+        var parts: [String] = []
+        for word in spoken {
+            while let next = pending.first, next.time <= word.time {
+                parts.append("[#\(next.number)]")
+                pending.removeFirst()
+            }
+            parts.append(word.text)
+        }
+        parts += pending.map { "[#\($0.number)]" }
+        committed = parts.joined(separator: " ")
+        speech = ""
+        self.words = []
+        markers = []
+    }
+
     func log(_ kind: Interaction.Kind, _ label: String, at time: Date = Date()) {
         // Hovering the same thing again isn't news.
         if kind == .hover, interactions.last(where: { $0.kind == .hover })?.label == label { return }
