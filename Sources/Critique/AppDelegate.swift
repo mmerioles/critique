@@ -53,6 +53,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func openWindow() { window.show() }
 
     /// Clicking the Dock icon brings the window back.
+    /// critique:// links (like "Return to Critique" on the sign-in page) bring the window forward.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        guard urls.contains(where: { $0.scheme == "critique" }) else { return }
+        window.show()
+    }
+
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         window.show()
         return true

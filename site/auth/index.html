@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Signed in to Critique</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="../logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles.css?v=6">
+  <style>
+    .auth { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; text-align: center; }
+    .auth-card { max-width: 440px; width: 100%; background: var(--paper); border: 1px solid var(--line); border-radius: 20px; padding: 44px 32px 36px; }
+    .auth-mark { width: 56px; height: 56px; color: var(--ink); }
+    .auth h1 { font-size: 44px; line-height: 1.05; margin: 22px 0 10px; }
+    .auth p { color: var(--muted); margin: 0; }
+    .auth .download { margin-top: 28px; }
+    .auth .later { margin-top: 14px; font-size: 14px; }
+    .auth .home { display: inline-block; margin-top: 28px; font-size: 14px; color: var(--muted); }
+    .auth .home:hover { color: var(--ink); }
+  </style>
+</head>
+<body>
+  <main class="auth">
+    <div class="auth-card">
+      <svg class="auth-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true"><circle cx="13" cy="13" r="8.5" stroke="currentColor" stroke-width="3"/><path d="M19.4 19.4 L27 27" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"/><circle cx="13" cy="13" r="2.6" fill="#FF3B30"/></svg>
+      <h1 id="title">You're <em>signed in</em></h1>
+      <p id="detail">Critique is connected to your GitHub account. You can close this tab and go back to the app.</p>
+      <a class="download" id="open" href="critique://signed-in">Return to Critique</a>
+      <p class="later">Or close this tab. Critique already knows.</p>
+    </div>
+  </main>
+  <script>
+    // GitHub sends ?error=access_denied when someone cancels.
+    var error = new URLSearchParams(location.search).get("error");
+    if (error) {
+      document.getElementById("title").innerHTML = "Sign-in <em>canceled</em>";
+      document.getElementById("detail").textContent = error === "access_denied"
+        ? "Nothing was shared with Critique. You can try again from the Account page in the app."
+        : "Something went wrong with GitHub. Try again from the Account page in the app.";
+      document.querySelector(".later").textContent = "You can close this tab.";
+    }
+  </script>
+</body>
+</html>

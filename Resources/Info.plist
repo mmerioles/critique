@@ -20,6 +20,19 @@
     <string>15.0</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>dev.critique.app</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>critique</string>
+            </array>
+        </dict>
+    </array>
+    <key>GitHubClientID</key>
+    <string>Ov23libb5GvxarNUp0z7</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>Critique listens while you describe what you see, so your coding agent gets your feedback in your own words.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
