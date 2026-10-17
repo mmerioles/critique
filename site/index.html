@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Critique — show your coding agent what's wrong</title>
+  <meta name="description" content="Talk over your screen and draw on it. Critique hands your words, marked-up screenshots and a screen recording to your coding agent.">
+  <link rel="icon" href="logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="nav-wrap">
+  <nav class="nav">
+    <a class="brand" href="#top"><img src="logo.png" alt=""><span>Critique</span></a>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#install">Install</a>
+      <a href="#pricing">Pricing</a>
+      <a href="https://github.com/mmerioles/critique">GitHub</a>
+      <a class="button button-dark" href="#install">Get started on macOS</a>
+    </div>
+  </nav>
+</header>
+
+<main id="top">
+
+  <!-- Hero -->
+  <section class="hero">
+    <p class="eyebrow">Critique for macOS</p>
+    <h1>Don't describe it,<br><em>just point.</em></h1>
+    <p class="lede">Talk over your screen and draw on it. Critique hands your words, marked-up screenshots and a recording to your coding agent.</p>
+    <a class="button button-dark button-large" href="#install">Get started on macOS</a>
+    <p class="fine">Free and open source · Works with Claude Code</p>
+
+    <!-- A flat illustration of a critique in progress -->
+    <div class="demo" aria-hidden="true">
+      <div class="window">
+        <div class="window-bar"><i></i><i></i><i></i><span>localhost:3000</span></div>
+        <div class="window-body">
+          <div class="mock-line wide"></div>
+          <div class="mock-line"></div>
+          <div class="mock-button">Sign up</div>
+          <svg class="stroke" viewBox="0 0 260 110" preserveAspectRatio="none">
+            <path d="M30 60 C 20 15, 230 5, 238 50 C 246 95, 40 108, 22 70 C 16 55, 40 38, 70 34"/>
+          </svg>
+          <span class="badge">1</span>
+        </div>
+      </div>
+      <div class="caption">“This button is way too big<sup>1</sup> and it's not centered.”</div>
+      <div class="pill">
+        <span class="dot"></span>
+        <span class="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+        <span class="time">0:07</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section id="features" class="section">
+    <p class="eyebrow">What it does</p>
+    <h2>Feedback the way you'd <em>give it in person</em></h2>
+    <div class="grid four">
+      <article class="card">
+        <div class="icon"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></div>
+        <h3>Just talk</h3>
+        <p>Say what feels off, like you're screen-sharing with a teammate. Transcribed on your Mac.</p>
+      </article>
+      <article class="card">
+        <div class="icon"><svg viewBox="0 0 24 24"><path d="M4 20c4-1 6-6 9-6s2 4 5 4 2-3 2-3"/><path d="M14 4l6 6-8 8H6v-6z"/></svg></div>
+        <h3>Draw on anything</h3>
+        <p>Hold <kbd>`</kbd> and move the mouse. Each drawing captures the whole screen with your marks.</p>
+      </article>
+      <article class="card">
+        <div class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5" class="fill"/></svg></div>
+        <h3>One continuous session</h3>
+        <p>No stopping to screenshot. Click, scroll and switch apps — it's all one recording on one timeline.</p>
+      </article>
+      <article class="card">
+        <div class="icon"><svg viewBox="0 0 24 24"><path d="M20 5v7a3 3 0 0 1-3 3H5"/><path d="M9 11l-4 4 4 4"/></svg></div>
+        <h3>Lands in your agent</h3>
+        <p>Critique types one line into Claude Code. You press Enter. Also available over MCP.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section class="section">
+    <p class="eyebrow">How it works</p>
+    <h2>Three steps, <em>no tools</em></h2>
+    <ol class="steps">
+      <li><span class="num">1</span><div><h3>Double-tap right <kbd>⌥</kbd></h3><p>A red ring follows your cursor. Critique starts listening and recording.</p></div></li>
+      <li><span class="num">2</span><div><h3>Talk and draw</h3><p>Say what you see. Hold <kbd>`</kbd> to mark it up. Clicks and hovers are logged too.</p></div></li>
+      <li><span class="num">3</span><div><h3>Double-tap again</h3><p>Your agent gets everything, lined up by time. Press Enter to implement.</p></div></li>
+    </ol>
+  </section>
+
+  <!-- Install -->
+  <section id="install" class="section">
+    <p class="eyebrow">Install</p>
+    <h2>Up and running <em>in a minute</em></h2>
+    <div class="grid two">
+      <article class="card">
+        <h3>Download</h3>
+        <p>Get the latest build for macOS 15 or later.</p>
+        <a class="button button-dark" href="https://github.com/mmerioles/critique/releases/latest">Download for macOS</a>
+        <p class="fine">First launch: right-click Critique and choose Open.</p>
+      </article>
+      <article class="card">
+        <h3>Build from source</h3>
+        <p>Needs Xcode or the Swift command line tools.</p>
+<pre><code>git clone https://github.com/mmerioles/critique
+cd critique && make install</code></pre>
+      </article>
+    </div>
+    <div class="card connect">
+      <div>
+        <h3>Connect Claude Code</h3>
+        <p>Run once, then ask: <em>“Check my latest critique and fix it.”</em></p>
+      </div>
+<pre><code>claude mcp add critique -- /Applications/Critique.app/Contents/MacOS/Critique mcp</code></pre>
+    </div>
+  </section>
+
+  <!-- Pricing -->
+  <section id="pricing" class="section">
+    <p class="eyebrow">Pricing</p>
+    <h2>Free for you, <em>ready for your team</em></h2>
+    <div class="grid three pricing">
+      <article class="plan">
+        <span class="tag tag-red">Free</span>
+        <p class="eyebrow">For everyone</p>
+        <p class="price">$0<span>/mo</span></p>
+        <a class="button button-outline" href="#install">Get started</a>
+        <p class="includes">Includes:</p>
+        <ul>
+          <li>Unlimited critiques</li>
+          <li>Voice, drawing and screen recording</li>
+          <li>Claude Code handoff and MCP</li>
+          <li>Everything stays on your Mac</li>
+        </ul>
+      </article>
+      <article class="plan plan-featured">
+        <span class="tag tag-dark">Pro</span>
+        <p class="eyebrow">For individuals</p>
+        <p class="price">$8<span>/mo</span></p>
+        <a class="button button-dark" href="#install">Join the waitlist</a>
+        <p class="includes">Everything in Free, plus:</p>
+        <ul>
+          <li>Search across all critiques</li>
+          <li>Share a critique as a link</li>
+          <li>Longer recording history</li>
+          <li>Priority support</li>
+        </ul>
+      </article>
+      <article class="plan">
+        <span class="tag tag-cream">Team</span>
+        <p class="eyebrow">For product teams</p>
+        <p class="price">Custom</p>
+        <a class="button button-dark" href="https://github.com/mmerioles/critique/issues">Talk to us</a>
+        <p class="includes">Everything in Pro, plus:</p>
+        <ul>
+          <li>Shared team inbox</li>
+          <li>Send critiques to any teammate's agent</li>
+          <li>Admin controls</li>
+          <li>Onboarding help</li>
+        </ul>
+      </article>
+    </div>
+
+    <h3 class="compare-title">Compare plans</h3>
+    <div class="table-wrap">
+      <table class="compare">
+        <thead><tr><th></th><th>Free</th><th>Pro</th><th>Team</th></tr></thead>
+        <tbody>
+          <tr><td>Voice transcription, on your Mac</td><td>✓</td><td>✓</td><td>✓</td></tr>
+          <tr><td>Draw on screen with <kbd>`</kbd></td><td>✓</td><td>✓</td><td>✓</td></tr>
+          <tr><td>Screen recording and timeline</td><td>✓</td><td>✓</td><td>✓</td></tr>
+          <tr><td>Claude Code handoff and MCP</td><td>✓</td><td>✓</td><td>✓</td></tr>
+          <tr><td>Search across critiques</td><td>—</td><td>✓</td><td>✓</td></tr>
+          <tr><td>Share as a link</td><td>—</td><td>✓</td><td>✓</td></tr>
+          <tr><td>Shared team inbox</td><td>—</td><td>—</td><td>✓</td></tr>
+          <tr><td>Admin controls</td><td>—</td><td>—</td><td>✓</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="footer-cols">
+    <div>
+      <p class="eyebrow">Product</p>
+      <a href="#features">Features</a>
+      <a href="#install">Install</a>
+      <a href="#pricing">Pricing</a>
+    </div>
+    <div>
+      <p class="eyebrow">Resources</p>
+      <a href="https://github.com/mmerioles/critique">GitHub</a>
+      <a href="https://github.com/mmerioles/critique/releases">Releases</a>
+      <a href="https://github.com/mmerioles/critique/issues">Report a bug</a>
+    </div>
+    <div>
+      <p class="eyebrow">Works with</p>
+      <a href="https://claude.com/claude-code">Claude Code</a>
+      <a href="https://modelcontextprotocol.io">Any MCP client</a>
+    </div>
+  </div>
+  <div class="wordmark"><img src="logo.png" alt=""><span>Critique</span></div>
+  <div class="footer-bottom">
+    <span>© 2026 Critique</span>
+    <a href="https://github.com/mmerioles/critique">Open source on GitHub</a>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,24 @@
+# Tag a version (git tag v0.1.0 && git push --tags) to publish a downloadable build.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the app
+        run: make app SIGN_ID=-
+      - name: Zip it
+        run: ditto -c -k --keepParent build/Critique.app Critique-macOS.zip
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: Critique-macOS.zip
+          generate_release_notes: true

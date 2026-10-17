@@ -1,0 +1,17 @@
+# Makes sure the Mac app still builds.
+name: Build
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["site/**", "**.md"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the app
+        run: make app SIGN_ID=-

@@ -6,7 +6,8 @@
 
 <p align="center">
   <b>Show your coding agent what's wrong, the way you'd show a teammate.</b><br>
-  Talk, point at your screen, and Critique hands it all to your agent.
+  Talk, point at your screen, and Critique hands it all to your agent.<br>
+  <a href="https://mmerioles.github.io/critique/">Website</a> · <a href="https://github.com/mmerioles/critique/releases/latest">Download</a>
 </p>
 
 <p align="center">
@@ -44,20 +45,20 @@ Permissions on but not working? Run `tccutil reset All dev.critique.app` and all
 ## How it works
 
 1. **Double-tap right Option** anywhere. A red ring follows your cursor.
-2. **Talk and point:**
-   - **Rest** on something, and it gets a red box.
-   - **Hold `` ` ``** and move the mouse to draw.
-   - **Click or hover**, and it's logged.
+2. **Talk, and mark up what you mean:**
+   - **Hold `` ` ``** and move the mouse to draw. Each drawing takes a whole-screen screenshot.
+   - Clicks and hovers are logged too, without screenshots.
 3. **Double-tap right Option again to send.** `esc` cancels.
+
+Every critique shows up in the Critique app with its time, your words, and your marked-up screenshots.
 
 Your agent gets your words, a screen recording, marked-up screenshots, and a timeline that lines them up:
 
-> The header looks fine but **[#2]** this button is way too big **[#3]** and this text is cut off.
+> The header looks fine but **[#1]** this button is way too big and this text is cut off.
 >
 > - 0:00.9 clicked menu button “File”
 > - 0:01.6 hovered menu item “Export…” · frame: `…/frames/0-01.8.jpg`
-> - 0:02.4 #2 pointing at button “Sign up”
-> - 0:04.2 #3 drew around button “Sign up”, link “Cancel”
+> - 0:04.2 #1 drew around button “Sign up”, link “Cancel”
 
 ## Getting feedback to your agent
 
