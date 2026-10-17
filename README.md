@@ -1,8 +1,20 @@
-# Critique
+<p align="center">
+  <img src="docs/logo.png" width="128" alt="Critique logo">
+</p>
 
-**Talk to your coding agent about your app the way you'd talk to a teammate looking at your screen.**
+<h1 align="center">Critique</h1>
 
-Double-tap right Option, then talk and point with your cursor. Critique records your voice, your screen, and what you point at, and hands it all to your coding agent.
+<p align="center">
+  <b>Show your coding agent what's wrong, the way you'd show a teammate.</b><br>
+  Talk, point at your screen, and Critique hands it all to your agent.
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/version-0.1.0-ff3b30" alt="Version 0.1.0">
+  <img src="https://img.shields.io/badge/platform-macOS%2015%2B-000000?logo=apple" alt="macOS 15+">
+  <img src="https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white" alt="Swift 6">
+  <img src="https://img.shields.io/badge/works%20with-Claude%20Code-D97757" alt="Works with Claude Code">
+</p>
 
 ```
  double-tap right ⌥  →  talk + point  →  double-tap right ⌥  →  your agent has it
@@ -18,17 +30,20 @@ make install     # builds, copies to /Applications, launches
 make run         # builds and launches from ./build
 ```
 
-On first use, macOS asks for a few permissions. Each one is used for:
-- **Screen Recording**, so Critique can see your screen. You may need to reopen the app after allowing it.
-- **Input Monitoring**, so Critique can notice the right Option double-tap. Until you allow it, `⌃⌥Space` works as a backup.
-- **Accessibility**, so Critique can find the exact button or text you point at and box it.
-- **Microphone + Speech Recognition**, for dictation. This runs on-device.
+On first launch, allow Critique in **System Settings → Privacy & Security**:
 
-> `make` signs with your Apple Development certificate if you have one, so permissions stick across rebuilds. If permissions look on but don't work, run `tccutil reset All dev.critique.app`, reopen the app, and allow again.
+| Permission | Why |
+|---|---|
+| Screen Recording | See your screen |
+| Input Monitoring | Notice the right ⌥ double-tap (`⌃⌥Space` works meanwhile) |
+| Accessibility | Box the exact button you point at |
+| Microphone + Speech Recognition | On-device dictation |
+
+Permissions on but not working? Run `tccutil reset All dev.critique.app` and allow again.
 
 ## How it works
 
-1. **Double-tap right Option** anywhere. A small pill shows your voice as a waveform, and a red ring follows your cursor.
+1. **Double-tap right Option** anywhere. A red ring follows your cursor.
 2. **Talk and point:**
    - **Rest** on something, and it gets a red box.
    - **Hold `` ` ``** and move the mouse to draw.
@@ -46,15 +61,10 @@ Your agent gets your words, a screen recording, marked-up screenshots, and a tim
 
 ## Getting feedback to your agent
 
-When you send, Critique switches back to Claude Code and types one line into the prompt:
+When you send, Critique types one line into Claude Code: `Implement my UX feedback from Critique: …/feedback.md`. Press **Enter**.
 
+The feedback is also on your clipboard, saved in `~/.critique/inbox/`, and available over MCP:
+
+```sh
+claude mcp add critique -- /Applications/Critique.app/Contents/MacOS/Critique mcp
 ```
-> Implement my UX feedback from Critique: ~/.critique/inbox/…/feedback.md (4 screenshots, 0:38 recording). …
-```
-
-Press **Enter** to implement. It only types into a terminal tab where Claude Code is running. Otherwise, the full feedback is on your clipboard to paste. You can turn this off from the menu bar: *Paste Into Agent After Sending*.
-
-Other ways your agent can get it:
-
-- **MCP:** `claude mcp add critique -- /Applications/Critique.app/Contents/MacOS/Critique mcp`. Then tell your agent *"wait for my UX feedback and fix it"*.
-- **Files:** everything is saved to `~/.critique/inbox/<time>/`. `Critique latest` prints the newest one.
