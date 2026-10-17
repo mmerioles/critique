@@ -14,11 +14,9 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - name: Build the app
-        run: make app SIGN_ID=-
-      - name: Zip it
-        run: ditto -c -k --keepParent build/Critique.app Critique-macOS.zip
+      - name: Build the DMG
+        run: make dmg SIGN_ID=-
       - uses: softprops/action-gh-release@v2
         with:
-          files: Critique-macOS.zip
+          files: build/Critique.dmg
           generate_release_notes: true

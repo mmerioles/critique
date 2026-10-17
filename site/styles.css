@@ -203,9 +203,32 @@ main { padding: 0 24px; }
 .pill .wave i:nth-child(3n) { height: 11px; }
 .pill .time { font-size: 13px; color: #aaa; font-variant-numeric: tabular-nums; }
 
-/* Install */
-.connect { margin-top: 20px; }
-.connect pre { white-space: pre-wrap; word-break: break-all; }
+/* Install: everything centered */
+.install { text-align: center; }
+.dmg {
+  max-width: 560px; margin: 0 auto;
+  background: var(--paper); border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
+}
+.dmg-bar { position: relative; display: flex; gap: 7px; padding: 11px 14px; border-bottom: 1px solid var(--line); }
+.dmg-bar i { width: 11px; height: 11px; border-radius: 50%; background: var(--line); }
+.dmg-bar span { position: absolute; left: 0; right: 0; font-size: 13px; color: var(--muted); }
+.dmg-body { display: flex; align-items: center; justify-content: center; gap: 28px; padding: 40px 24px 34px; }
+.dmg figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.dmg figcaption { font-size: 14px; }
+.dmg-arrow { fill: none; stroke: var(--red); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 7 7; }
+.install-steps {
+  list-style: none; padding: 0; margin: 36px auto 0;
+  display: flex; justify-content: center; flex-wrap: wrap; gap: 14px 32px;
+  font-size: 16px;
+}
+.install-steps li { display: flex; align-items: center; gap: 10px; }
+.install-steps span {
+  width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--ink);
+  font: 400 17px/24px var(--serif); text-align: center;
+}
+.connect-line { max-width: 760px; margin: 48px auto 0; }
+.connect-line p { color: var(--muted); font-size: 15px; }
+.connect-line pre { white-space: pre; overflow-x: auto; text-align: left; font-size: 13px; }
 
 /* Pricing */
 .pricing { align-items: stretch; }
