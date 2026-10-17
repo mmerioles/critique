@@ -2,13 +2,13 @@ import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 
-/// A tiny MCP server (JSON-RPC over stdio) that hands UX Flow feedback —
+/// A tiny MCP server (JSON-RPC over stdio) that hands Critique feedback —
 /// your words plus screenshots — straight to a coding agent.
 ///
-///   claude mcp add uxflow -- /Applications/UXFlow.app/Contents/MacOS/UXFlow mcp
+///   claude mcp add critique -- /Applications/Critique.app/Contents/MacOS/Critique mcp
 enum MCPServer {
-    private static let output = DispatchQueue(label: "uxflow.mcp.output")
-    private static let work = DispatchQueue(label: "uxflow.mcp.work", attributes: .concurrent)
+    private static let output = DispatchQueue(label: "critique.mcp.output")
+    private static let work = DispatchQueue(label: "critique.mcp.work", attributes: .concurrent)
 
     static func run() -> Never {
         while let line = readLine() {
@@ -28,8 +28,8 @@ enum MCPServer {
             reply(id, result: [
                 "protocolVersion": params["protocolVersion"] as? String ?? "2025-06-18",
                 "capabilities": ["tools": [:]],
-                "serverInfo": ["name": "uxflow", "version": "0.1.0"],
-                "instructions": "UX Flow lets the user give UI feedback by talking over their screen. "
+                "serverInfo": ["name": "critique", "version": "0.1.0"],
+                "instructions": "Critique lets the user give UI feedback by talking over their screen. "
                     + "Call get_feedback to read it (notes + annotated screenshots). "
                     + "Call wait_for_feedback to wait for their next round while iterating.",
             ])
@@ -48,7 +48,7 @@ enum MCPServer {
     private static let tools: [[String: Any]] = [
         [
             "name": "get_feedback",
-            "description": "Get UX feedback the user recorded with UX Flow: what they said while looking at their screen, plus screenshots with the parts they highlighted. Returns all unread feedback (oldest first), or the latest if everything has been read. Pass an id to get a specific one.",
+            "description": "Get UX feedback the user recorded with Critique: what they said while looking at their screen, plus screenshots with the parts they highlighted. Returns all unread feedback (oldest first), or the latest if everything has been read. Pass an id to get a specific one.",
             "inputSchema": ["type": "object", "properties": [
                 "id": ["type": "string", "description": "Feedback id from list_feedback (optional)"],
             ]],
@@ -62,7 +62,7 @@ enum MCPServer {
         ],
         [
             "name": "list_feedback",
-            "description": "List recent UX Flow feedback with ids, times, and whether it has been read.",
+            "description": "List recent Critique feedback with ids, times, and whether it has been read.",
             "inputSchema": ["type": "object", "properties": [:]],
         ],
     ]

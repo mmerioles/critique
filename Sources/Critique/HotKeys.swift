@@ -2,7 +2,7 @@ import Carbon.HIToolbox
 import Foundation
 
 /// System-wide hotkeys via Carbon. They need no Accessibility permission, and
-/// while registered the key goes to UX Flow instead of the app underneath.
+/// while registered the key goes to Critique instead of the app underneath.
 final class HotKeys {
     static let shared = HotKeys()
 
@@ -23,7 +23,7 @@ final class HotKeys {
         let id = nextID
         nextID += 1
         var ref: EventHotKeyRef?
-        let hotKeyID = EventHotKeyID(signature: OSType(0x5558_4657), id: id) // 'UXFW'
+        let hotKeyID = EventHotKeyID(signature: OSType(0x4352_5451), id: id) // 'CRTQ'
         let status = RegisterEventHotKey(UInt32(keyCode), UInt32(modifiers), hotKeyID,
                                          GetApplicationEventTarget(), 0, &ref)
         guard status == noErr, let ref else { return nil }

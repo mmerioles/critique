@@ -22,32 +22,41 @@ final class Dictation {
     private var finishCompletion: (() -> Void)?
     private var segmentStart = Date()
     private var firstSeen: [Date] = []
+    private var peakLevel: Float = 0
+    private var resultCount = 0
 
     var isRunning: Bool { state == .running }
 
     static func authorize() async -> Bool {
         let speech = await withCheckedContinuation { cont in
-            SFSpeechRecognizer.requestAuthorization { cont.resume(returning: $0 == .authorized) }
+            SFSpeechRecognizer.requestAuthorization { cont.resume(returning: $0) }
         }
         let mic = await AVCaptureDevice.requestAccess(for: .audio)
-        return speech && mic
+        log("speech permission \(speech.rawValue) (3 = allowed), microphone \(mic ? "allowed" : "denied")")
+        return speech == .authorized && mic
     }
 
     func start() throws {
         guard state == .idle else { return }
         guard let recognizer, recognizer.isAvailable else {
-            throw NSError(domain: "UXFlow", code: 2, userInfo: [NSLocalizedDescriptionKey: "Speech recognition unavailable"])
+            throw NSError(domain: "Critique", code: 2, userInfo: [NSLocalizedDescriptionKey: "Speech recognition unavailable"])
         }
         let input = engine.inputNode
         let box = self.box
         input.installTap(onBus: 0, bufferSize: 1024, format: input.outputFormat(forBus: 0)) { [weak self] buffer, _ in
             box.append(buffer)
             let level = Self.level(of: buffer)
-            DispatchQueue.main.async { self?.onLevel(level) }
+            DispatchQueue.main.async {
+                self?.peakLevel = max(self?.peakLevel ?? 0, level)
+                self?.onLevel(level)
+            }
         }
         engine.prepare()
         try engine.start()
+        log("listening (on-device: \(recognizer.supportsOnDeviceRecognition), mic format: \(input.outputFormat(forBus: 0)))")
         state = .running
+        peakLevel = 0
+        resultCount = 0
         beginSegment()
     }
 
@@ -63,6 +72,9 @@ final class Dictation {
 
     /// Stops right away and throws away anything unfinished.
     func stop() {
+        if state != .idle {
+            log("stopped listening — loudest level \(String(format: "%.2f", peakLevel)) (0–1), \(resultCount) speech results")
+        }
         if state == .running { stopAudio() }
         state = .idle
         finishCompletion = nil
@@ -91,6 +103,7 @@ final class Dictation {
         let current = generation
         segmentStart = Date()
         firstSeen = []
+        log("speech segment started")
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
         request.addsPunctuation = true
@@ -99,12 +112,15 @@ final class Dictation {
         task = recognizer.recognitionTask(with: request) { [weak self] result, error in
             let transcription = result?.bestTranscription
             let isFinal = result?.isFinal ?? false
+            if let error { log("speech recognition ended: \(error.localizedDescription)") }
             DispatchQueue.main.async {
                 guard let self, self.generation == current, self.state != .idle else { return }
                 if let transcription {
+                    self.resultCount += 1
                     self.onSpeech(transcription.formattedString, self.wordTimes(transcription))
                 }
                 guard isFinal || error != nil else { return }
+                log("speech segment ended (final: \(isFinal)): “\(transcription?.formattedString ?? "")”")
                 self.onSegmentEnd()
                 if self.state == .finishing {
                     self.completeFinish()

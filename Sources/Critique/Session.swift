@@ -79,6 +79,7 @@ final class Session: ObservableObject {
 
     // Speech still being recognized, plus markers waiting to be placed in it.
     @Published private var speech = ""
+    var liveSpeech: String { speech }
     private var words: [WordTime] = []
     private var markers: [Marker] = []
 
@@ -102,7 +103,7 @@ final class Session: ObservableObject {
     /// word wait for the next words you say.
     func commitSpeech() {
         let ns = speech as NSString
-        for word in words where word.offset + word.length <= ns.length {
+        for word in words where word.length > 0 && word.offset + word.length <= ns.length {
             spoken.append(SpokenWord(text: ns.substring(with: NSRange(location: word.offset, length: word.length)), time: word.time))
         }
         let result = Self.place(markers, in: speech, words: words, trailing: false)

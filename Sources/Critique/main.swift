@@ -1,7 +1,7 @@
 import AppKit
 
-// `UXFlow mcp`    → run as an MCP server so coding agents can pull feedback.
-// `UXFlow latest` → print the newest feedback as Markdown.
+// `Critique mcp`    → run as an MCP server so coding agents can pull feedback.
+// `Critique latest` → print the newest feedback as Markdown.
 // no arguments    → run the menu bar app.
 switch CommandLine.arguments.dropFirst().first {
 case "mcp":

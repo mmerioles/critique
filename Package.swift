@@ -2,10 +2,10 @@
 import PackageDescription
 
 let package = Package(
-    name: "UXFlow",
+    name: "Critique",
     platforms: [.macOS(.v15)],
     targets: [
-        .executableTarget(name: "UXFlow", path: "Sources/UXFlow")
+        .executableTarget(name: "Critique", path: "Sources/Critique")
     ],
     swiftLanguageModes: [.v5]
 )

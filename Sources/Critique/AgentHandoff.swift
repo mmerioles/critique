@@ -1,7 +1,11 @@
 import AppKit
 
-/// After you send feedback, puts it straight into your coding agent's prompt
-/// (e.g. Claude Code in your terminal) — without pressing Enter. You review and hit ⏎.
+/// After you send feedback, types a one-line pointer to it into Claude Code's
+/// prompt — without pressing Enter. You review and hit ⏎.
+///
+/// Safety: it only types into a window whose title shows Claude Code is running
+/// (Claude Code puts ✳ or a spinner in the terminal title), and only ever a single
+/// line, so it can never run anything in a plain shell.
 @MainActor
 final class AgentHandoff {
     /// Apps where coding agents usually live. The one you used most recently wins.
@@ -33,10 +37,9 @@ final class AgentHandoff {
         }
     }
 
-    /// Brings your agent's app forward and pastes the clipboard (the feedback),
-    /// followed by a one-line instruction. Calls back with the app's name, or nil
-    /// if it couldn't (then the feedback is still on the clipboard).
-    func deliver(instruction: String, completion: @escaping (String?) -> Void) {
+    /// Brings your agent's app forward and types `line` into its prompt. Calls back
+    /// with the app's name, or nil if Claude Code wasn't found in focus.
+    func deliver(line: String, completion: @escaping (String?) -> Void) {
         guard isEnabled, AXIsProcessTrusted(),
               let app = lastAgentApp, !app.isTerminated, let url = app.bundleURL else { return completion(nil) }
         let config = NSWorkspace.OpenConfiguration()
@@ -45,13 +48,10 @@ final class AgentHandoff {
         app.activate()
 
         waitUntilFrontmost(app, tries: 15) { ready in
-            // Never type into the wrong app.
-            guard ready else { return completion(nil) }
-            Self.press(9, flags: .maskCommand) // ⌘V
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                Self.type(" " + instruction)
-                completion(app.localizedName)
-            }
+            // Never type into the wrong app or a plain shell.
+            guard ready, Self.showsClaudeCode(app) else { return completion(nil) }
+            Self.type(line.replacingOccurrences(of: "\n", with: " "))
+            completion(app.localizedName)
         }
     }
 
@@ -66,17 +66,21 @@ final class AgentHandoff {
         }
     }
 
-    nonisolated private static func isAgentApp(_ app: NSRunningApplication) -> Bool {
-        app.bundleIdentifier.map(agentApps.contains) ?? false
+    /// Claude Code sets the terminal title to "✳ <task>" when idle and a braille
+    /// spinner while working.
+    private static func showsClaudeCode(_ app: NSRunningApplication) -> Bool {
+        let element = AXUIElementCreateApplication(app.processIdentifier)
+        var window: CFTypeRef?, title: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXFocusedWindowAttribute as CFString, &window) == .success,
+              let window, CFGetTypeID(window) == AXUIElementGetTypeID(),
+              AXUIElementCopyAttributeValue(window as! AXUIElement, kAXTitleAttribute as CFString, &title) == .success,
+              let text = title as? String else { return false }
+        if text.contains("✳") || text.localizedCaseInsensitiveContains("claude") { return true }
+        return text.unicodeScalars.contains { (0x2800...0x28FF).contains($0.value) }
     }
 
-    private static func press(_ keyCode: CGKeyCode, flags: CGEventFlags = []) {
-        let source = CGEventSource(stateID: .hidSystemState)
-        for down in [true, false] {
-            let event = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: down)
-            event?.flags = flags
-            event?.post(tap: .cghidEventTap)
-        }
+    nonisolated private static func isAgentApp(_ app: NSRunningApplication) -> Bool {
+        app.bundleIdentifier.map(agentApps.contains) ?? false
     }
 
     /// Types text as if from the keyboard (works with any keyboard layout).

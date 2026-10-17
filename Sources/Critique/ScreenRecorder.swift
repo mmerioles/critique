@@ -9,7 +9,7 @@ final class ScreenRecorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegat
     private(set) var url: URL?
     private(set) var startedAt: Date?
 
-    /// `excluding` are window numbers to leave out of the video (UX Flow's bar).
+    /// `excluding` are window numbers to leave out of the video (Critique's bar).
     func start(_ screen: NSScreen, excluding windowNumbers: [Int]) async throws {
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
         guard let display = content.displays.first(where: { $0.displayID == screen.displayID }) else { return }

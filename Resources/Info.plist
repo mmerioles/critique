@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key>
-    <string>dev.uxflow.app</string>
+    <string>dev.critique.app</string>
     <key>CFBundleName</key>
-    <string>UX Flow</string>
+    <string>Critique</string>
     <key>CFBundleDisplayName</key>
-    <string>UX Flow</string>
+    <string>Critique</string>
     <key>CFBundleExecutable</key>
-    <string>UXFlow</string>
+    <string>Critique</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -21,8 +21,8 @@
     <key>LSUIElement</key>
     <true/>
     <key>NSMicrophoneUsageDescription</key>
-    <string>UX Flow listens while you describe what you see, so your coding agent gets your feedback in your own words.</string>
+    <string>Critique listens while you describe what you see, so your coding agent gets your feedback in your own words.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
-    <string>UX Flow turns your spoken feedback into text for your coding agent.</string>
+    <string>Critique turns your spoken feedback into text for your coding agent.</string>
 </dict>
 </plist>

@@ -10,11 +10,11 @@ enum ScreenCapture {
         return NSScreen.screens.first { NSMouseInRect(point, $0.frame, false) } ?? NSScreen.main ?? NSScreen.screens[0]
     }
 
-    /// Full-resolution screenshot of one display, with UX Flow's own windows left out.
+    /// Full-resolution screenshot of one display, with Critique's own windows left out.
     static func capture(_ screen: NSScreen) async throws -> CGImage {
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
         guard let display = content.displays.first(where: { $0.displayID == screen.displayID }) else {
-            throw NSError(domain: "UXFlow", code: 1, userInfo: [NSLocalizedDescriptionKey: "Display not found"])
+            throw NSError(domain: "Critique", code: 1, userInfo: [NSLocalizedDescriptionKey: "Display not found"])
         }
         let ourselves = content.applications.filter { $0.processID == getpid() }
         let filter = SCContentFilter(display: display, excludingApplications: ourselves, exceptingWindows: [])

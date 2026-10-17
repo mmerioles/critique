@@ -1,4 +1,4 @@
-APP     := build/UXFlow.app
+APP     := build/Critique.app
 # Sign with your Apple Development certificate if you have one, so macOS keeps
 # permissions (Screen Recording, Input Monitoring) across rebuilds.
 SIGN_ID ?= $(shell security find-identity -v -p codesigning | grep -m1 -o '"Apple Development[^"]*"' | tr -d '"' || true)
@@ -8,12 +8,12 @@ endif
 
 .PHONY: app run install clean
 
-# Build the menu bar app into build/UXFlow.app
+# Build the menu bar app into build/Critique.app
 app:
 	swift build -c release
 	rm -rf $(APP)
 	mkdir -p $(APP)/Contents/MacOS
-	cp .build/release/UXFlow $(APP)/Contents/MacOS/UXFlow
+	cp .build/release/Critique $(APP)/Contents/MacOS/Critique
 	cp Resources/Info.plist $(APP)/Contents/Info.plist
 	codesign --force --sign "$(SIGN_ID)" $(APP)
 
@@ -23,9 +23,9 @@ run: app
 
 # Copy to /Applications and launch
 install: app
-	rm -rf /Applications/UXFlow.app
-	cp -R $(APP) /Applications/UXFlow.app
-	open /Applications/UXFlow.app
+	rm -rf /Applications/Critique.app
+	cp -R $(APP) /Applications/Critique.app
+	open /Applications/Critique.app
 
 clean:
 	rm -rf .build build

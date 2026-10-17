@@ -22,7 +22,7 @@ final class PointerTracker {
     var onHover: (NSPoint) -> Void = { _ in }
     /// Resting only counts while you're talking, so a parked cursor doesn't fire.
     var isTalking: () -> Bool = { true }
-    /// Areas to ignore, such as UX Flow's own bar.
+    /// Areas to ignore, such as Critique's own bar.
     var ignore: (NSPoint) -> Bool = { _ in false }
 
     let markup = Markup()
@@ -139,7 +139,7 @@ final class PointerTracker {
 }
 
 /// Click-through overlays (one per display) that draw the cursor ring and the
-/// red boxes. UX Flow leaves these out of screenshots and draws its own marks
+/// red boxes. Critique leaves these out of screenshots and draws its own marks
 /// there instead; the screen recording does show them.
 @MainActor
 final class Markup {

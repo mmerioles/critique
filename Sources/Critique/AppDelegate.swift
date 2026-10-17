@@ -2,19 +2,19 @@ import AppKit
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private var flow: FlowController!
+    private var critique: CritiqueController!
     private var statusItem: NSStatusItem!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        flow = FlowController()
+        critique = CritiqueController()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        statusItem.button?.image = NSImage(systemSymbolName: "bubble.and.pencil", accessibilityDescription: "UX Flow")
+        statusItem.button?.image = NSImage(systemSymbolName: "bubble.and.pencil", accessibilityDescription: "Critique")
 
         let menu = NSMenu()
         menu.addItem(item("Give Feedback  (double-tap right ⌥)", #selector(giveFeedback)))
         menu.addItem(.separator())
         let paste = item("Paste Into Agent After Sending", #selector(togglePaste))
-        paste.state = flow.handoff.isEnabled ? .on : .off
+        paste.state = critique.handoff.isEnabled ? .on : .off
         menu.addItem(paste)
         menu.addItem(item("Copy Latest Feedback", #selector(copyLatest)))
         menu.addItem(item("Open Feedback Inbox", #selector(openInbox)))
@@ -23,15 +23,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(item("Screen Recording Settings…", #selector(openPrivacy)))
         menu.addItem(item("Input Monitoring Settings…", #selector(openInputMonitoring)))
         menu.addItem(item("Accessibility Settings…", #selector(openAccessibility)))
-        menu.addItem(item("Quit UX Flow", #selector(quit)))
+        menu.addItem(item("Quit Critique", #selector(quit)))
         statusItem.menu = menu
 
         if !ScreenCapture.hasPermission { ScreenCapture.requestPermission() }
-        // Lets UX Flow box the exact button/text you point at.
+        // Lets Critique box the exact button/text you point at.
         if !ElementLocator.isTrusted { ElementLocator.requestTrust() }
-        flow.notice(CGPreflightListenEventAccess()
+        critique.notice(CGPreflightListenEventAccess()
                     ? "Ready. Double-tap right Option anywhere to give feedback."
-                    : "Allow Input Monitoring for UX Flow to use double-tap right Option. ⌃⌥Space works meanwhile.",
+                    : "Allow Input Monitoring for Critique to use double-tap right Option. ⌃⌥Space works meanwhile.",
                     seconds: 4)
     }
 
@@ -41,21 +41,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return item
     }
 
-    @objc private func giveFeedback() { flow.toggle() }
+    @objc private func giveFeedback() { critique.toggle() }
 
     @objc private func togglePaste(_ sender: NSMenuItem) {
-        flow.handoff.isEnabled.toggle()
-        sender.state = flow.handoff.isEnabled ? .on : .off
+        critique.handoff.isEnabled.toggle()
+        sender.state = critique.handoff.isEnabled ? .on : .off
     }
 
     @objc private func copyLatest() {
         guard let dir = Inbox.items().first, let record = Inbox.load(dir) else {
-            flow.notice("No feedback yet.", seconds: 2)
+            critique.notice("No feedback yet.", seconds: 2)
             return
         }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(record.markdown(in: dir), forType: .string)
-        flow.notice("Latest feedback copied — paste it into your agent.", seconds: 2)
+        critique.notice("Latest feedback copied — paste it into your agent.", seconds: 2)
     }
 
     @objc private func openInbox() {
@@ -64,10 +64,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func copyMCPCommand() {
-        let exe = Bundle.main.executableURL?.path ?? "/Applications/UXFlow.app/Contents/MacOS/UXFlow"
+        let exe = Bundle.main.executableURL?.path ?? "/Applications/Critique.app/Contents/MacOS/Critique"
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString("claude mcp add uxflow -- \"\(exe)\" mcp", forType: .string)
-        flow.notice("Copied. Paste it in your terminal to give Claude Code your feedback.", seconds: 3)
+        NSPasteboard.general.setString("claude mcp add critique -- \"\(exe)\" mcp", forType: .string)
+        critique.notice("Copied. Paste it in your terminal to give Claude Code your feedback.", seconds: 3)
     }
 
     @objc private func openPrivacy() {

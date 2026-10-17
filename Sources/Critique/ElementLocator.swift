@@ -3,7 +3,7 @@ import ApplicationServices
 
 /// Finds the UI element under the cursor (a button, link, image, piece of text…)
 /// using macOS Accessibility — the same tech screen readers use. This is what lets
-/// UX Flow draw a box around "this button" without you drawing anything.
+/// Critique draw a box around "this button" without you drawing anything.
 enum ElementLocator {
     struct Element {
         /// Global coordinates, top-left origin.
@@ -66,7 +66,7 @@ enum ElementLocator {
 
     // MARK: - Private (runs on `queue`)
 
-    private static let queue = DispatchQueue(label: "uxflow.accessibility")
+    private static let queue = DispatchQueue(label: "critique.accessibility")
     private static var awakened = Set<pid_t>()
     private static let systemWide: AXUIElement = {
         let element = AXUIElementCreateSystemWide()
@@ -78,6 +78,11 @@ enum ElementLocator {
     private static let stopRoles: Set<String> = ["AXWindow", "AXApplication", "AXWebArea", "AXDesktop", "AXMenuBar"]
     /// Layout-only wrappers that are never what you mean.
     private static let wrapperRoles: Set<String> = ["AXScrollArea", "AXSplitGroup", "AXLayoutArea", "AXUnknown", "AXSplitter"]
+    /// Generic containers ("group", "article", "list"…) — too vague to box. When the
+    /// cursor is on one of these, Critique shows a ring at the cursor instead.
+    private static let genericRoles: Set<String> = ["AXGroup", "AXList", "AXSection", "AXGeneric", "AXLayoutItem",
+                                                    "AXOutline", "AXTable", "AXBrowser", "AXGrid", "AXColumn",
+                                                    "AXRow", "AXLandmarkMain", "AXDocument", "AXSheet", "AXDrawer"]
     /// If the thing under the cursor sits inside one of these, box the control instead (text inside a button → the button).
     private static let controlRoles: Set<String> = ["AXButton", "AXLink", "AXMenuItem", "AXCheckBox", "AXRadioButton",
                                                     "AXPopUpButton", "AXMenuButton", "AXCell", "AXTab", "AXDisclosureTriangle"]
@@ -98,7 +103,7 @@ enum ElementLocator {
 
         for _ in 0..<10 {
             let role = string(element, kAXRoleAttribute) ?? ""
-            if stopRoles.contains(role) { return nil }
+            if stopRoles.contains(role) || genericRoles.contains(role) { return nil }
             if let f = frame(element), !wrapperRoles.contains(role) {
                 if f.width * f.height > maxArea { return nil } // grew to a whole panel — too vague
                 if f.width >= 14 && f.height >= 10 {
@@ -119,7 +124,7 @@ enum ElementLocator {
         let kind = string(element, kAXRoleDescriptionAttribute) ?? role.replacingOccurrences(of: "AX", with: "").lowercased()
         let text = [kAXTitleAttribute, kAXDescriptionAttribute, kAXValueAttribute]
             .lazy.compactMap { string(element, $0) }
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .map { $0.split(whereSeparator: \.isWhitespace).joined(separator: " ") } // one line
             .first { !$0.isEmpty }
         guard let text else { return kind }
         return "\(kind) “\(text.count > 80 ? text.prefix(80) + "…" : text)”"

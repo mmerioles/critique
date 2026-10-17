@@ -2,16 +2,16 @@ import AppKit
 import Combine
 import SwiftUI
 
-/// The small floating bar at the bottom of the screen — UX Flow's whole UI.
+/// The small floating bar at the bottom of the screen — Critique's whole UI.
 /// It never steals focus from the app you're testing (except while typing).
-final class FlowBarPanel: NSPanel {
-    private let hosting: NSHostingView<FlowBarView>
+final class PillPanel: NSPanel {
+    private let hosting: NSHostingView<PillView>
     private var observer: AnyCancellable?
     private weak var screenShown: NSScreen?
 
     @MainActor
     init(session: Session, onSubmitTyping: @escaping () -> Void) {
-        hosting = NSHostingView(rootView: FlowBarView(session: session, onSubmit: onSubmitTyping))
+        hosting = NSHostingView(rootView: PillView(session: session, onSubmit: onSubmitTyping))
         super.init(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel],
                    backing: .buffered, defer: false)
         level = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue + 1) // above the highlight overlay
@@ -62,7 +62,7 @@ final class FlowBarPanel: NSPanel {
     }
 }
 
-struct FlowBarView: View {
+struct PillView: View {
     @ObservedObject var session: Session
     var onSubmit: () -> Void
     @FocusState private var typingFocused: Bool
@@ -73,7 +73,7 @@ struct FlowBarView: View {
             case .sent(let detail):
                 card { status(icon: "checkmark.circle.fill", tint: .green, title: "Sent to your agent", detail: detail) }
             case .notice(let text):
-                card { status(icon: "sparkles", tint: .red, title: "UX Flow", detail: text) }
+                card { status(icon: "sparkles", tint: .red, title: "Critique", detail: text) }
             case .typing:
                 card { typing }
             default:

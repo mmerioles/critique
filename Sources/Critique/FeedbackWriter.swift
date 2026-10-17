@@ -93,18 +93,26 @@ enum FeedbackWriter {
         // Your words, grouped into phrases at pauses.
         var phrase: [SpokenWord] = []
         func flush() {
-            guard let first = phrase.first else { return }
-            moments.append(.init(at: at(first.time), kind: "said", text: phrase.map(\.text).joined(separator: " ")))
+            let text = phrase.map(\.text).joined(separator: " ").trimmingCharacters(in: .whitespaces)
+            if let first = phrase.first, !text.isEmpty {
+                moments.append(.init(at: at(first.time), kind: "said", text: text))
+            }
             phrase = []
         }
         for word in input.words {
-            if let last = phrase.last, word.time.timeIntervalSince(last.time) > 0.8 || phrase.count >= 20 { flush() }
+            // Break at long pauses (recognizer timing is bursty, so short gaps don't count).
+            if let last = phrase.last, word.time.timeIntervalSince(last.time) > 2.5 || phrase.count >= 30 { flush() }
             phrase.append(word)
+            if let end = word.text.last, ".?!".contains(end) { flush() } // and at sentence ends
         }
         flush()
 
         for interaction in input.interactions {
-            moments.append(.init(at: at(interaction.time), kind: interaction.kind.rawValue, text: interaction.label))
+            let t = at(interaction.time)
+            // A click that got its own screenshot is already in the timeline.
+            if interaction.kind == .click,
+               shots.contains(where: { $0.kind == "click" && $0.element == interaction.label && abs(($0.at ?? 0) - t) < 1 }) { continue }
+            moments.append(.init(at: t, kind: interaction.kind.rawValue, text: interaction.label))
         }
         for shot in shots where shot.kind != "screen" || shot.number > 1 {
             var text = "#\(shot.number) "
@@ -112,8 +120,11 @@ enum FeedbackWriter {
                 let inside = shot.inside ?? []
                 text += inside.isEmpty ? "drew on the screen" : "drew around \(inside.joined(separator: ", "))"
             } else {
-                text += FeedbackRecord.label(shot.kind).lowercased()
-                if let element = shot.element { text += " \(element)" }
+                if let element = shot.element {
+                    text += "\(FeedbackRecord.label(shot.kind).lowercased()) \(element)"
+                } else {
+                    text += shot.kind == "click" ? "clicked here" : "pointing here"
+                }
             }
             moments.append(.init(at: shot.at ?? 0, kind: "shot", text: text, shot: shot.number))
         }
@@ -279,21 +290,21 @@ enum FeedbackWriter {
 
     static func writeJPEG(_ image: CGImage, to url: URL) throws {
         guard let dest = CGImageDestinationCreateWithURL(url as CFURL, UTType.jpeg.identifier as CFString, 1, nil) else {
-            throw NSError(domain: "UXFlow", code: 3, userInfo: [NSLocalizedDescriptionKey: "Can't write \(url.path)"])
+            throw NSError(domain: "Critique", code: 3, userInfo: [NSLocalizedDescriptionKey: "Can't write \(url.path)"])
         }
         CGImageDestinationAddImage(dest, image, [kCGImageDestinationLossyCompressionQuality: 0.8] as CFDictionary)
         guard CGImageDestinationFinalize(dest) else {
-            throw NSError(domain: "UXFlow", code: 3, userInfo: [NSLocalizedDescriptionKey: "Can't write \(url.path)"])
+            throw NSError(domain: "Critique", code: 3, userInfo: [NSLocalizedDescriptionKey: "Can't write \(url.path)"])
         }
     }
 
     static func writePNG(_ image: CGImage, to url: URL) throws {
         guard let dest = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil) else {
-            throw NSError(domain: "UXFlow", code: 3, userInfo: [NSLocalizedDescriptionKey: "Can't write \(url.path)"])
+            throw NSError(domain: "Critique", code: 3, userInfo: [NSLocalizedDescriptionKey: "Can't write \(url.path)"])
         }
         CGImageDestinationAddImage(dest, image, nil)
         guard CGImageDestinationFinalize(dest) else {
-            throw NSError(domain: "UXFlow", code: 3, userInfo: [NSLocalizedDescriptionKey: "Can't write \(url.path)"])
+            throw NSError(domain: "Critique", code: 3, userInfo: [NSLocalizedDescriptionKey: "Can't write \(url.path)"])
         }
     }
 }

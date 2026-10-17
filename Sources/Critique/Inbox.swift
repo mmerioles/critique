@@ -1,9 +1,9 @@
 import Foundation
 
 /// Feedback lives on disk so any agent can read it:
-///   ~/.uxflow/inbox/<id>/feedback.md      ← human/agent-readable summary
-///   ~/.uxflow/inbox/<id>/feedback.json    ← structured version
-///   ~/.uxflow/inbox/<id>/*.png            ← screenshots (highlights are annotated)
+///   ~/.critique/inbox/<id>/feedback.md      ← human/agent-readable summary
+///   ~/.critique/inbox/<id>/feedback.json    ← structured version
+///   ~/.critique/inbox/<id>/*.png            ← screenshots (highlights are annotated)
 struct FeedbackRecord: Codable {
     struct ShotRecord: Codable {
         var number: Int
@@ -50,14 +50,16 @@ struct FeedbackRecord: Codable {
 
     func markdown(in dir: URL) -> String {
         var md = "# UX feedback · \(Self.displayDate.string(from: createdAt))\n\n"
-        md += "Recorded with UX Flow while the user talked over their screen — treat it like a teammate "
+        md += "Recorded with Critique while the user talked over their screen — treat it like a teammate "
         md += "screen-sharing with you. They use their cursor like a finger: red boxes and red strokes mark what "
         md += "they pointed at, drew on, or clicked. Markers like [#2] in their words show which screenshot they "
         md += "were pointing at as they said it. The timeline lines up their words, what they hovered and clicked, "
         md += "and the screen recording. Look at the images before changing code.\n\n"
 
         md += "## What they said\n\n"
-        md += notes.isEmpty ? "_(No notes — see the screenshots.)_\n\n"
+        let words = notes.replacingOccurrences(of: #"\[#\d+\]"#, with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        md += words.isEmpty ? "_(Nothing was said — follow the timeline and screenshots.)_\n\n"
             : notes.split(separator: "\n", omittingEmptySubsequences: false).map { "> \($0)" }.joined(separator: "\n") + "\n\n"
 
         if let timeline, !timeline.isEmpty {
@@ -119,10 +121,10 @@ struct FeedbackRecord: Codable {
 
 enum Inbox {
     static var root: URL {
-        if let custom = ProcessInfo.processInfo.environment["UXFLOW_HOME"] {
+        if let custom = ProcessInfo.processInfo.environment["CRITIQUE_HOME"] {
             return URL(fileURLWithPath: custom).appendingPathComponent("inbox")
         }
-        return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".uxflow/inbox")
+        return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".critique/inbox")
     }
 
     /// Feedback folders, newest first.

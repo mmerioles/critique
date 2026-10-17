@@ -1,5 +1,7 @@
 import AppKit
+import AVFoundation
 import Carbon.HIToolbox
+import Speech
 
 /// Runs a feedback session. Double-tap right Option to start, then just talk and
 /// point with your cursor; hold ` to draw on the screen. Double-tap again to send.
@@ -11,9 +13,9 @@ import Carbon.HIToolbox
 ///  - a screenshot each time you point, draw, or click — with your mark drawn in
 ///  - every button/link/menu item you hover or click, even ones too fleeting to screenshot
 @MainActor
-final class FlowController {
+final class CritiqueController {
     let session = Session()
-    private lazy var bar = FlowBarPanel(session: session) { [weak self] in self?.send() }
+    private lazy var bar = PillPanel(session: session) { [weak self] in self?.send() }
     private let dictation = Dictation()
     private let pointer = PointerTracker()
     private let recorder = ScreenRecorder()
@@ -28,8 +30,10 @@ final class FlowController {
 
     init() {
         dictation.onSpeech = { [weak self] text, words in
-            self?.session.updateSpeech(text, words: words)
-            self?.lastTalkedAt = Date()
+            guard let self else { return }
+            // "Talking" means words are actually being recognized, not just noise.
+            if !text.isEmpty, text != self.session.liveSpeech { self.lastTalkedAt = Date() }
+            self.session.updateSpeech(text, words: words)
         }
         dictation.onSegmentEnd = { [weak self] in self?.session.commitSpeech() }
         dictation.onLevel = { [weak self] level in self?.heard(level) }
@@ -84,7 +88,7 @@ final class FlowController {
                 guard session.isActive else { return }
                 cancel()
                 ScreenCapture.requestPermission()
-                notice("UX Flow can't see your screen. Turn it on in System Settings → Privacy & Security → Screen Recording, then reopen UX Flow.", seconds: 7)
+                notice("Critique can't see your screen. Turn it on in System Settings → Privacy & Security → Screen Recording, then reopen Critique.", seconds: 7)
                 return
             }
             guard session.isActive else { return }
@@ -95,17 +99,19 @@ final class FlowController {
             do {
                 try await recorder.start(screen, excluding: [bar.windowNumber])
             } catch {
-                NSLog("UX Flow: screen recording unavailable: \(error.localizedDescription)")
+                log("screen recording unavailable: \(error.localizedDescription)")
             }
             if !session.isActive { await recorder.discard() }
         }
         Task {
+            log("session started — speech permission \(SFSpeechRecognizer.authorizationStatus().rawValue), microphone \(AVCaptureDevice.authorizationStatus(for: .audio).rawValue) (3 = allowed, 0 = not asked yet)")
             let allowed = await Dictation.authorize()
             guard session.mode == .listening else { return }
             do {
-                guard allowed else { throw NSError(domain: "UXFlow", code: 4) }
+                guard allowed else { throw NSError(domain: "Critique", code: 4) }
                 try dictation.start()
             } catch {
+                log("can't listen: \(error.localizedDescription)")
                 session.micAvailable = false
                 session.mode = .typing
                 bar.makeKey()
@@ -162,13 +168,15 @@ final class FlowController {
             var summary = "\(count) screenshot\(count == 1 ? "" : "s")"
             if record.video != nil, let duration = record.duration { summary += ", \(FeedbackRecord.clock(duration)) recording" }
             sending = true // hold off new sessions until the paste is done
-            handoff.deliver(instruction: "Implement the UX feedback above (UX Flow: \(summary)).") { [weak self] app in
+            let path = dir.appendingPathComponent("feedback.md").path
+            let line = "Implement my UX feedback from Critique: \(path) (\(summary)). Read it and look at the screenshots first."
+            handoff.deliver(line: line) { [weak self] app in
                 guard let self else { return }
                 self.sending = false
                 if let app {
                     self.notice(nil, sent: "In \(app) — press ⏎ to implement", seconds: 2.4)
                 } else {
-                    self.notice(nil, sent: "\(summary) · copied — paste it into your agent", seconds: 3)
+                    self.notice(nil, sent: "\(summary) · copied — paste it into Claude Code (⌘V)", seconds: 3.5)
                 }
             }
         case .failure(let error):
@@ -194,7 +202,7 @@ final class FlowController {
         guard session.isActive else { return }
         let at = Date()
         let screen = NSScreen.screens.first { NSMouseInRect(p, $0.frame, false) } ?? ScreenCapture.screenUnderMouse()
-        let maxArea = screen.frame.width * screen.frame.height * 0.3
+        let maxArea = screen.frame.width * screen.frame.height * 0.15
         Task {
             guard let element = await ElementLocator.element(at: Self.topLeft(p), maxArea: maxArea),
                   element.isInteractive, session.isActive else { return }
@@ -206,7 +214,7 @@ final class FlowController {
     private func capture(_ gesture: PointerTracker.Gesture, at p: NSPoint, since: Date) {
         guard session.isActive else { return }
         let screen = NSScreen.screens.first { NSMouseInRect(p, $0.frame, false) } ?? ScreenCapture.screenUnderMouse()
-        let maxArea = screen.frame.width * screen.frame.height * 0.3
+        let maxArea = screen.frame.width * screen.frame.height * 0.15
         let context = ScreenCapture.windowContext(at: Self.topLeft(p))
 
         // A held ` with barely any movement is just pointing.
@@ -281,7 +289,6 @@ final class FlowController {
 
     private func heard(_ level: Float) {
         session.level = level
-        if level > 0.35 { lastTalkedAt = Date() }
         if Date().timeIntervalSince(lastLevelAt) > 0.05 {
             lastLevelAt = Date()
             session.pushLevel(level)
