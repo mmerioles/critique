@@ -110,7 +110,7 @@ private struct Banner: View {
                 VStack(alignment: .leading, spacing: 10) {
                     (Text("Critique anything ") + Text("on your screen").italic())
                         .font(.system(size: 28, weight: .regular, design: .serif))
-                    Text("Double-tap right option, then talk and point. Your agent gets the rest.")
+                    Text(verbatim: "Double-tap `, then talk and point. Your agent gets the rest.")
                         .font(.system(size: 14))
                         .foregroundStyle(.white.opacity(0.75))
                 }
@@ -154,7 +154,7 @@ private struct EmptyState: View {
         VStack(spacing: 10) {
             Image(systemName: "text.bubble").font(.system(size: 28)).foregroundStyle(Theme.tertiary)
             Text("No critiques yet").font(.system(size: 15, weight: .medium))
-            Text("Double-tap right ⌥ anywhere, talk, and point at what you mean.")
+            Text(verbatim: "Double-tap ` anywhere, talk, and point at what you mean.")
                 .font(.system(size: 13)).foregroundStyle(Theme.secondary)
         }
         .frame(maxWidth: .infinity)
@@ -180,8 +180,23 @@ struct CritiqueRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(Self.time(record.createdAt)).font(.system(size: 13)).foregroundStyle(Theme.secondary)
                 Text(details).font(.system(size: 11)).foregroundStyle(Theme.tertiary)
+                if let project = record.project {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.triangle.branch").font(.system(size: 9))
+                        Text(project.name.split(separator: "/").last.map(String.init) ?? project.name)
+                            .lineLimit(1).truncationMode(.tail)
+                    }
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Theme.secondary)
+                    .padding(.top, 4)
+                    .help("\(project.name)\(project.branch.map { " · \($0)" } ?? "")\n\(project.path)")
+                }
+                if item.canRewind {
+                    UndoControl(item: item, store: store, rowHovered: hovering)
+                        .padding(.top, 6)
+                }
             }
-            .frame(width: 92, alignment: .leading)
+            .frame(width: 104, alignment: .leading)
 
             VStack(alignment: .leading, spacing: 14) {
                 words
@@ -198,6 +213,9 @@ struct CritiqueRow: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            // Undone critiques fade back, so it's clear their changes are gone.
+            .opacity(item.isUndone ? 0.45 : 1)
+            .animation(.easeInOut(duration: 0.35), value: item.isUndone)
 
             // Actions get their own column so they never cover your words.
             actions
@@ -292,6 +310,139 @@ struct CritiqueRow: View {
         f.amSymbol = "am"
         f.pmSymbol = "pm"
         return f.string(from: date)
+    }
+}
+
+/// A small Undo pill that puts the project back to how it was before the
+/// critique, after a quick confirm. Once undone it reads "Undone · Redo".
+private struct UndoControl: View {
+    let item: CritiqueStore.Item
+    let store: CritiqueStore
+    let rowHovered: Bool
+    @State private var confirming = false
+    @State private var busy = false
+    @State private var message: String?
+    @State private var hovering = false
+
+    private enum Phase: Equatable { case hidden, undo, busy, undone }
+
+    private var phase: Phase {
+        if busy { return .busy }
+        if item.isUndone { return .undone }
+        return rowHovered || confirming ? .undo : .hidden
+    }
+
+    private var projectName: String {
+        let name = item.record.project?.name ?? "the project"
+        return name.split(separator: "/").last.map(String.init) ?? name
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ZStack(alignment: .leading) {
+                switch phase {
+                case .hidden:
+                    Color.clear.frame(height: 22)
+                case .undo:
+                    pill("arrow.uturn.backward", "Undo") { confirming = true }
+                        .help("Undo the changes made since this critique")
+                        .popover(isPresented: $confirming, arrowEdge: .trailing) { confirm }
+                        .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .leading)))
+                case .busy:
+                    HStack(spacing: 6) {
+                        ProgressView().controlSize(.mini)
+                        Text(item.isUndone ? "Redoing…" : "Undoing…")
+                    }
+                    .font(.system(size: 11)).foregroundStyle(Theme.secondary)
+                    .frame(height: 22)
+                    .transition(.opacity)
+                case .undone:
+                    HStack(spacing: 6) {
+                        Text("Undone").foregroundStyle(Theme.tertiary)
+                        Button("Redo") { run(redo: true) }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(Theme.secondary)
+                            .underline(hovering)
+                            .onHover { hovering = $0 }
+                            .help("Bring back the changes the undo removed")
+                    }
+                    .font(.system(size: 11, weight: .medium))
+                    .frame(height: 22)
+                    .transition(.opacity.combined(with: .move(edge: .leading)))
+                }
+            }
+            if let message {
+                Text(message)
+                    .font(.system(size: 10)).foregroundStyle(Theme.red)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: phase)
+        .animation(.easeOut(duration: 0.2), value: message)
+    }
+
+    private var confirm: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Undo this critique?").font(.system(size: 13, weight: .semibold))
+            Text("Puts \(projectName) back to how it was at \(CritiqueRow.time(item.record.createdAt)), before this critique. Commits and edits since then are undone. You can redo it.")
+                .font(.system(size: 12)).foregroundStyle(Theme.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Spacer()
+                Button("Cancel") { confirming = false }
+                    .keyboardShortcut(.cancelAction)
+                Button("Undo") {
+                    confirming = false
+                    run(redo: false)
+                }
+                .keyboardShortcut(.defaultAction)
+                .tint(Theme.red)
+            }
+        }
+        .padding(16)
+        .frame(width: 280)
+    }
+
+    private func pill(_ icon: String, _ title: String, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: icon).font(.system(size: 9, weight: .semibold))
+                Text(title)
+            }
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(hovering ? Theme.ink : Theme.secondary)
+            .padding(.horizontal, 9).frame(height: 22)
+            .background(Capsule().fill(hovering ? Theme.selected : Theme.panel))
+            .overlay(Capsule().strokeBorder(Theme.border))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .animation(.easeOut(duration: 0.12), value: hovering)
+    }
+
+    private func run(redo: Bool) {
+        // Rewinding while the agent is mid-edit would fight with it.
+        if Agents.shared.master?.status == .working {
+            flash("Wait for \(Agents.shared.master?.kind.name ?? "the agent") to finish")
+            return
+        }
+        message = nil
+        busy = true
+        Task {
+            let error = redo ? await store.redo(item) : await store.undo(item)
+            busy = false
+            if let error { flash(error) }
+        }
+    }
+
+    private func flash(_ text: String) {
+        message = text
+        Task {
+            try? await Task.sleep(for: .seconds(4))
+            if message == text { message = nil }
+        }
     }
 }
 

@@ -52,6 +52,9 @@ enum Page: String, CaseIterable, Identifiable {
     case connect = "Connect"
     case account = "Account"
     case storage = "Storage"
+    case repos = "Repos"
+    case agent = "Agent"
+    case mobile = "Mobile"
     var id: String { rawValue }
     var icon: String {
         switch self {
@@ -61,6 +64,9 @@ enum Page: String, CaseIterable, Identifiable {
         case .connect: "point.3.connected.trianglepath.dotted"
         case .account: "person.crop.circle"
         case .storage: "internaldrive"
+        case .repos: "arrow.triangle.branch"
+        case .agent: "terminal"
+        case .mobile: "iphone.gen3"
         }
     }
 }
@@ -82,6 +88,9 @@ struct RootView: View {
                 case .connect: ConnectPage()
                 case .account: AccountPage()
                 case .storage: StoragePage(store: store)
+                case .repos: ReposPage()
+                case .agent: AgentPage()
+                case .mobile: MobilePage()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -100,6 +109,7 @@ struct RootView: View {
 
 struct Sidebar: View {
     @Binding var page: Page
+    @ObservedObject private var projects = Projects.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -130,12 +140,25 @@ struct Sidebar: View {
             Spacer()
 
             VStack(alignment: .center, spacing: 10) {
-                Text("Start a critique").font(.system(size: 12, weight: .semibold))
+                VStack(spacing: 3) {
+                    Text("Start a critique").font(.system(size: 12, weight: .semibold))
+                    if let project = projects.active {
+                        Button { page = .agent } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.triangle.branch")
+                                Text(project.name.split(separator: "/").last.map(String.init) ?? project.name).lineLimit(1)
+                            }
+                            .font(.system(size: 11)).foregroundStyle(Theme.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Critiques go to \(project.name). Change it on the Agent page.")
+                    }
+                }
                 HStack(spacing: 6) {
-                    KeyboardKey.option
+                    KeyboardKey.backtick
                     Text("× 2").font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.secondary)
                 }
-                Text("Double-tap right option, then talk. Hold ` to draw.")
+                Text(verbatim: "Double-tap ` to start and send. Hold ` to draw.")
                     .font(.system(size: 11)).foregroundStyle(Theme.secondary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)

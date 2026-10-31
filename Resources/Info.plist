@@ -35,6 +35,13 @@
     <string>Ov23libb5GvxarNUp0z7</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>Critique listens while you describe what you see, so your coding agent gets your feedback in your own words.</string>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>Critique finds and connects to your Android phone over Wi‑Fi (Wireless debugging), so you can critique an app from your phone.</string>
+    <key>NSBonjourServices</key>
+    <array>
+        <string>_adb-tls-pairing._tcp</string>
+        <string>_adb-tls-connect._tcp</string>
+    </array>
     <key>NSSpeechRecognitionUsageDescription</key>
     <string>Critique turns your spoken feedback into text for your coding agent.</string>
 </dict>

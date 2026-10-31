@@ -6,7 +6,11 @@ ifeq ($(strip $(SIGN_ID)),)
 SIGN_ID := -
 endif
 
-.PHONY: app dmg run install clean
+.PHONY: app dmg run install clean helper
+
+# Rebuild the phone helper (Quick Settings tile) into Resources/critique-helper.apk
+helper:
+	./android-helper/build.sh
 
 # Build the menu bar app into build/Critique.app
 app:
@@ -17,6 +21,7 @@ app:
 	cp Resources/Info.plist $(APP)/Contents/Info.plist
 	mkdir -p $(APP)/Contents/Resources
 	cp Resources/AppIcon.icns $(APP)/Contents/Resources/AppIcon.icns
+	cp Resources/critique-helper.apk $(APP)/Contents/Resources/critique-helper.apk
 	codesign --force --sign "$(SIGN_ID)" $(APP)
 
 # Build the app and package it as a drag-to-Applications DMG

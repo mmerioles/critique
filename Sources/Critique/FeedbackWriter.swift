@@ -25,6 +25,8 @@ enum FeedbackWriter {
         var liveNotes: String? = nil
         /// Which speech engine produced `notes`.
         var engine: String? = nil
+        /// The phone it was recorded on, for phone critiques.
+        var device: FeedbackRecord.DeviceRecord? = nil
     }
 
     static func write(_ input: Input) throws -> (dir: URL, record: FeedbackRecord) {
@@ -55,6 +57,7 @@ enum FeedbackWriter {
             if let region = shot.region {
                 record.region = [Int(region.minX), Int(region.minY), Int(region.width), Int(region.height)]
             }
+            if let point = shot.point { record.pointer = [Int(point.x), Int(point.y)] }
             try writePNG(image, to: dir.appendingPathComponent(record.file))
             shots.append(record)
         }
@@ -74,6 +77,12 @@ enum FeedbackWriter {
             if (try? FileManager.default.moveItem(at: audio, to: dest)) != nil { record.audio = dest.lastPathComponent }
         }
         record.engine = input.engine
+        record.device = input.device
+        record.project = Projects.activeRecord()
+        // Remember how the project looks before the agent touches it, so Undo can put it back.
+        if let project = record.project {
+            record.before = Rewind.snapshot(URL(fileURLWithPath: project.path), name: id)
+        }
         if let live = input.liveNotes?.trimmingCharacters(in: .whitespacesAndNewlines), !live.isEmpty,
            Self.normalized(live) != Self.normalized(input.notes) {
             record.liveNotes = live
@@ -130,7 +139,7 @@ enum FeedbackWriter {
                 if let element = shot.element {
                     text += "\(FeedbackRecord.label(shot.kind).lowercased()) \(element)"
                 } else {
-                    text += shot.kind == "click" ? "clicked here" : "pointing here"
+                    text += ["click": "clicked here", "tap": "tapped here"][shot.kind] ?? "pointing here"
                 }
             }
             moments.append(.init(at: shot.at ?? 0, kind: "shot", text: text, shot: shot.number))

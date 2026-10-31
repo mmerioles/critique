@@ -53,6 +53,32 @@ struct FeedbackRecord: Codable {
     var liveNotes: String?
     /// Which speech engine produced `notes`
     var engine: String?
+    /// The project this critique is for, picked on the Agent page
+    var project: ProjectRecord?
+    /// The project as it was when this critique was made, for Undo
+    var before: Rewind.Point?
+    /// Set while this critique's changes are undone: how things were just before, for Redo
+    var redo: Rewind.Point?
+    /// The phone this critique was recorded on, for phone critiques
+    var device: DeviceRecord?
+
+    struct DeviceRecord: Codable {
+        var model: String
+        var serial: String
+        /// Package of the app being tested, e.g. bordgame.app
+        var app: String?
+        var activity: String?
+        /// Critique rebuilds and reinstalls the app once the agent is done
+        var reinstalls: Bool?
+    }
+
+    struct ProjectRecord: Codable {
+        /// owner/name on GitHub, or the folder name
+        var name: String
+        var path: String
+        var branch: String?
+        var remote: String?
+    }
 
     func markdown(in dir: URL) -> String {
         var md = "# UX feedback · \(Self.displayDate.string(from: createdAt))\n\n"
@@ -61,6 +87,26 @@ struct FeedbackRecord: Codable {
         md += "they pointed at, drew on, or clicked. Markers like [#2] in their words show which screenshot they "
         md += "were pointing at as they said it. The timeline lines up their words, what they hovered and clicked, "
         md += "and the screen recording. Look at the images before changing code.\n\n"
+
+        if let project {
+            md += "## Project\n\n"
+            md += "This critique is for **\(project.name)** at `\(project.path)`"
+            if let branch = project.branch { md += " (branch `\(branch)`)" }
+            md += ". Make the changes there.\n\n"
+        }
+
+        if let device {
+            md += "## Phone\n\n"
+            md += "Recorded on their Android phone (**\(device.model)**, adb serial `\(device.serial)`)"
+            if let app = device.app { md += " while testing `\(app)`\(device.activity.map { " (`\($0)`)" } ?? "")" }
+            md += ". Screenshots are frames from the phone's screen; the red ring marks where they tapped. "
+            md += "Swipes are in the timeline. "
+            if device.reinstalls == true {
+                md += "When you finish, Critique rebuilds the app with Gradle (`installDebug`) and installs it on the phone, "
+                md += "so you don't need to install it yourself — just make sure it builds."
+            }
+            md += "\n\n"
+        }
 
         md += "## What they said\n\n"
         let words = notes.replacingOccurrences(of: #"\[#\d+\]"#, with: "", options: .regularExpression)
@@ -116,7 +162,7 @@ struct FeedbackRecord: Codable {
     }
 
     static func label(_ kind: String) -> String {
-        ["drawing": "Drew on", "highlight": "Circled", "pointer": "Pointing at", "click": "Clicked"][kind] ?? "Screen"
+        ["drawing": "Drew on", "highlight": "Circled", "pointer": "Pointing at", "click": "Clicked", "tap": "Tapped"][kind] ?? "Screen"
     }
 
     static func clock(_ seconds: Double, tenths: Bool = false) -> String {

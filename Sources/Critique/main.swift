@@ -10,7 +10,7 @@ case "latest":
     if let dir = Inbox.items().first, let record = Inbox.load(dir) {
         print(record.markdown(in: dir))
     } else {
-        print("No feedback yet. Double-tap right Option to record some.")
+        print("No feedback yet. Double-tap ` to record some.")
     }
 default:
     MainActor.assumeIsolated {

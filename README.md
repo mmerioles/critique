@@ -21,7 +21,7 @@
 </p>
 
 ```
- double-tap right ⌥  →  talk + point  →  double-tap right ⌥  →  your agent has it
+ double-tap `  →  talk + point  →  double-tap `  →  your agent has it
 ```
 
 ## Install
@@ -39,7 +39,7 @@ On first launch, allow Critique in **System Settings → Privacy & Security**:
 | Permission | Why |
 |---|---|
 | Screen Recording | See your screen |
-| Input Monitoring | Notice the right ⌥ double-tap |
+| Input Monitoring | Notice the ` double-tap |
 | Accessibility | Box the exact button you point at |
 | Microphone + Speech Recognition | On-device dictation |
 
@@ -47,11 +47,11 @@ Permissions on but not working? Run `tccutil reset All dev.critique.app` and all
 
 ## How it works
 
-1. **Double-tap right Option** anywhere. A red ring follows your cursor.
+1. **Double-tap `** (the key above Tab) anywhere. A red ring follows your cursor.
 2. **Talk, and mark up what you mean:**
    - **Hold `` ` ``** and move the mouse to draw. Each drawing takes a whole-screen screenshot.
    - Clicks and hovers are logged too, without screenshots.
-3. **Double-tap right Option again to send.** `esc` cancels.
+3. **Double-tap ` again to send.** `esc` cancels.
 
 Every critique shows up in the Critique app with its time, your words, and your marked-up screenshots.
 
@@ -63,6 +63,17 @@ Your agent gets your words, a screen recording, marked-up screenshots, and a tim
 > - 0:01.6 hovered menu item “Export…” · frame: `…/frames/0-01.8.jpg`
 > - 0:04.2 #1 drew around button “Sign up”, link “Cancel”
 
+## Critique from your Android phone
+
+The **Mobile** page lets you critique an Android app while you hold the phone.
+
+1. Phone and Mac on the same Wi‑Fi. On the phone: Developer options → **Wireless debugging** → Pair device with pairing code. Enter it on the Mobile page.
+2. Click **Install tile**. Critique installs a small helper and adds a **Critique** tile to Quick Settings.
+3. Tap the tile, use the app and talk, tap it again to send. Critique records the phone's screen and mic over adb ([scrcpy](https://github.com/Genymobile/scrcpy), `brew install scrcpy`), and each tap becomes a screenshot with a ring where your finger was.
+4. When the agent is done, Critique runs `./gradlew installDebug` for the project and reopens the app on your phone.
+
+The helper's source is in `android-helper/` (`make helper` rebuilds it).
+
 ## Getting feedback to your agent
 
 When you send, Critique types one line into Claude Code and presses Enter for you: `Implement my UX feedback from Critique: …/feedback.md`.
@@ -72,3 +83,15 @@ The feedback is also on your clipboard, saved in `~/.critique/inbox/`, and avail
 ```sh
 claude mcp add critique -- /Applications/Critique.app/Contents/MacOS/Critique mcp
 ```
+
+### Pick a project
+
+The Repos tab lists the git projects on your Mac and your GitHub repos. Pick one and every critique is tagged with it. Over MCP, an agent only picks up critiques for the folder it's running in. Critiques with no project go to any agent.
+
+Click **Check for Updates** (or the refresh button on a repo) to fetch from GitHub and see what's new upstream. Nothing is pulled until you click **Pull** on a repo or **Update All**. Both only fast-forward, so a repo with local commits or conflicting changes is left as it is. Click a repo's branch to switch to another one, including branches that are only on origin.
+
+### Run an agent from Critique
+
+The Agent tab runs one main agent (Claude Code, Codex or Gemini CLI, with the model you pick) in your projects folder: `~/repos` unless you choose another. It runs in the background with no window. **Show** opens its terminal, and closing that window keeps it running. Every critique goes to it along with the project it's for, so it can work in any of your repos. It stops when you quit Critique.
+
+The top of the tab shows your Claude plan usage, the 5-hour window and the week, the same numbers as `/usage`. It reads Claude Code's saved sign-in from your keychain.

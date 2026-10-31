@@ -7,6 +7,7 @@ struct Shot {
         case drawing     // you held ` and drew on the screen
         case pointer     // your cursor rested on something while you talked
         case click       // you clicked something
+        case tap         // you tapped your phone's screen (phone critiques)
     }
     let number: Int
     let kind: Kind
@@ -37,7 +38,7 @@ struct WordTime {
 /// Something you hovered or clicked — logged even when no screenshot is taken,
 /// so the agent can line it up with the screen recording.
 struct Interaction {
-    enum Kind: String { case hover, click }
+    enum Kind: String { case hover, click, swipe }
     let kind: Kind
     let label: String
     let time: Date

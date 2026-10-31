@@ -3,14 +3,19 @@ import ScreenCaptureKit
 
 /// Records the screen plus your microphone into a .mov for the whole session,
 /// so the agent can see motion (animations, hovers, flows) — not just stills.
-final class ScreenRecorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegate {
+final class ScreenRecorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegate, SCStreamOutput {
     private var stream: SCStream?
+    /// Frames also go here and are ignored. Without a stream output, ScreenCaptureKit
+    /// logs an error for every frame (over a hundred a second) while recording to file.
+    private let frames = DispatchQueue(label: "critique.recorder.frames", qos: .utility)
     private var finished: CheckedContinuation<Void, Never>?
     private(set) var url: URL?
     private(set) var startedAt: Date?
 
     /// `excluding` are window numbers to leave out of the video (Critique's bar).
     func start(_ screen: NSScreen, excluding windowNumbers: [Int], microphone: Bool) async throws {
+        // Never leave an earlier recording running in the background.
+        if stream != nil { await discard() }
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
         guard let display = content.displays.first(where: { $0.displayID == screen.displayID }) else { return }
         let hidden = content.windows.filter { windowNumbers.contains(Int($0.windowID)) }
@@ -33,6 +38,8 @@ final class ScreenRecorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegat
 
         let stream = SCStream(filter: filter, configuration: config, delegate: self)
         try stream.addRecordingOutput(SCRecordingOutput(configuration: recording, delegate: self))
+        try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: frames)
+        if microphone { try stream.addStreamOutput(self, type: .microphone, sampleHandlerQueue: frames) }
         try await stream.startCapture()
         self.stream = stream
         self.url = url
@@ -44,6 +51,7 @@ final class ScreenRecorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegat
         guard let stream else { return nil }
         self.stream = nil
         await withCheckedContinuation { cont in
+            finished?.resume() // an earlier stop still waiting
             finished = cont
             Task {
                 try? await stream.stopCapture()
@@ -67,6 +75,8 @@ final class ScreenRecorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegat
             self.finished = nil
         }
     }
+
+    func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {}
 
     func recordingOutputDidFinishRecording(_ recordingOutput: SCRecordingOutput) { resumeFinished() }
     func recordingOutput(_ recordingOutput: SCRecordingOutput, didFailWithError error: Error) { resumeFinished() }

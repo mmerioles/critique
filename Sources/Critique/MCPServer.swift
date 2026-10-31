@@ -55,7 +55,7 @@ enum MCPServer {
         ],
         [
             "name": "wait_for_feedback",
-            "description": "Wait for the user's next piece of UX feedback (they double-tap right Option, talk, highlight, and send). Use after making changes so they can review and respond. Returns the feedback, or a timeout message.",
+            "description": "Wait for the user's next piece of UX feedback (they double-tap the ` key, talk, highlight, and send). Use after making changes so they can review and respond. Returns the feedback, or a timeout message.",
             "inputSchema": ["type": "object", "properties": [
                 "timeout_seconds": ["type": "number", "description": "How long to wait. Default 600."],
             ]],
@@ -75,17 +75,17 @@ enum MCPServer {
                 return Inbox.load(dir) == nil ? text("No feedback with id \(id).") : content(for: [dir])
             }
             let all = Inbox.items()
-            let unread = all.filter { !Inbox.isSeen($0) }.reversed()
+            let unread = all.filter { !Inbox.isSeen($0) && isForThisProject($0) }.reversed()
             if !unread.isEmpty { return content(for: Array(unread)) }
             if let latest = all.first { return content(for: [latest], note: "No unread feedback — here is the latest (already read).") }
-            return text("No feedback yet. Ask the user to double-tap right Option, describe what they see, and double-tap again to send.")
+            return text("No feedback yet. Ask the user to double-tap the ` key, describe what they see, and double-tap again to send.")
 
         case "wait_for_feedback":
             let timeout = min(max((args["timeout_seconds"] as? Double) ?? 600, 1), 3600)
             let deadline = Date().addingTimeInterval(timeout)
             let known = Set(Inbox.items().map(\.lastPathComponent))
             while Date() < deadline {
-                let fresh = Inbox.items().filter { !known.contains($0.lastPathComponent) && !Inbox.isSeen($0) }
+                let fresh = Inbox.items().filter { !known.contains($0.lastPathComponent) && !Inbox.isSeen($0) && isForThisProject($0) }
                 if !fresh.isEmpty { return content(for: fresh.reversed()) }
                 Thread.sleep(forTimeInterval: 0.5)
             }
@@ -102,6 +102,17 @@ enum MCPServer {
         default:
             return ["isError": true, "content": [["type": "text", "text": "Unknown tool: \(name)"]]]
         }
+    }
+
+    /// Critiques tagged for another project are left for the agent working in that project.
+    /// Untagged ones, or when the agent isn't in a project folder, go to anyone.
+    private static func isForThisProject(_ dir: URL) -> Bool {
+        guard let path = Inbox.load(dir)?.project?.path else { return true }
+        let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).resolvingSymlinksInPath().path
+        let home = FileManager.default.homeDirectoryForCurrentUser.resolvingSymlinksInPath().path
+        guard cwd != "/", cwd != home else { return true }
+        let project = URL(fileURLWithPath: path).resolvingSymlinksInPath().path
+        return cwd == project || cwd.hasPrefix(project + "/") || project.hasPrefix(cwd + "/")
     }
 
     /// Markdown for each item, followed by its screenshots as images. Marks them read.

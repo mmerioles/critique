@@ -11,12 +11,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         critique = CritiqueController()
         store = CritiqueStore()
         window = MainWindow(store: store, handoff: critique.handoff)
+        // Phone critiques (Mobile page) go to the agent the same way desktop ones do.
+        Mobile.shared.deliver = { [weak critique] result in critique?.finishSending(result) }
+        Mobile.shared.notice = { [weak critique] text in critique?.notice(text, seconds: 3.5) }
+        Mobile.shared.startWatching()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: "Critique")
 
         let menu = NSMenu()
         menu.addItem(item("Open Critique", #selector(openWindow)))
-        menu.addItem(item("Give Feedback  (double-tap right ⌥)", #selector(giveFeedback)))
+        menu.addItem(item("Give Feedback  (double-tap `)", #selector(giveFeedback)))
         menu.addItem(.separator())
         let paste = item("Send to Claude Code Automatically", #selector(togglePaste))
         paste.state = critique.handoff.isEnabled ? .on : .off
@@ -32,13 +36,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.menu = menu
 
         window.show()
+        // The agent runs from the start, so your first critique has somewhere to go.
+        Agents.shared.ensureRunning()
         Task { await Transcriber.prepare() } // get the speech model ready before the first critique
         if !ScreenCapture.hasPermission { ScreenCapture.requestPermission() }
         // Lets Critique box the exact button/text you point at.
         if !ElementLocator.isTrusted { ElementLocator.requestTrust() }
         critique.notice(CGPreflightListenEventAccess()
-                    ? "Ready. Double-tap right Option anywhere to give feedback."
-                    : "Allow Input Monitoring for Critique to use double-tap right Option. ⌃⌥Space works meanwhile.",
+                    ? "Ready. Double-tap ` anywhere to give feedback."
+                    : "Allow Input Monitoring for Critique to use the ` double-tap. ⌃⌥Space works meanwhile.",
                     seconds: 4)
     }
 
@@ -54,6 +60,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Clicking the Dock icon brings the window back.
     /// critique:// links (like "Return to Critique" on the sign-in page) bring the window forward.
+    /// Agents run inside Critique, so quitting stops them. Check first.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        let count = Agents.shared.running.count
+        guard count > 0 else { return .terminateNow }
+        let alert = NSAlert()
+        alert.messageText = count == 1 ? "Stop the running agent and quit?" : "Stop \(count) running agents and quit?"
+        alert.informativeText = "Claude Code runs inside Critique, so it stops when Critique quits."
+        alert.addButton(withTitle: "Quit")
+        alert.addButton(withTitle: "Cancel")
+        NSApp.activate()
+        guard alert.runModal() == .alertFirstButtonReturn else { return .terminateCancel }
+        Agents.shared.stopAll()
+        return .terminateNow
+    }
+
     func application(_ application: NSApplication, open urls: [URL]) {
         guard urls.contains(where: { $0.scheme == "critique" }) else { return }
         window.show()

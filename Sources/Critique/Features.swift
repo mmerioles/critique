@@ -5,7 +5,7 @@ import Foundation
 enum Feature: String, CaseIterable {
     case screen         // screen recording + screenshots
     case voice          // microphone + speech recognition
-    case doubleTap      // right ⌥ double-tap (Input Monitoring)
+    case doubleTap      // ` double-tap (Input Monitoring)
     case accessibility  // element names, hover/click log, typing into Claude Code
 
     var isOn: Bool { UserDefaults.standard.object(forKey: key) as? Bool ?? true }

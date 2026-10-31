@@ -33,7 +33,7 @@ final class GitHubAccount: ObservableObject {
 
     private var signIn: Task<Void, Never>?
     private static let profileKey = "github.profile"
-    private static let keychainService = "dev.critique.github"
+    nonisolated private static let keychainService = "dev.critique.github"
 
     static var clientID: String? {
         let id = (Bundle.main.object(forInfoDictionaryKey: "GitHubClientID") as? String)?
@@ -43,10 +43,32 @@ final class GitHubAccount: ObservableObject {
 
     var isConfigured: Bool { Self.clientID != nil }
 
+    /// The token, read from the keychain once and kept in memory. The keychain is
+    /// only ever touched off the main thread: a keychain call can stall for a long
+    /// time, and on the main thread that freezes the whole app.
+    private var token: String?
+    private var tokenRead = false
+    /// Your repos, fetched once per launch (Refresh on the Repos page fetches again).
+    @Published private(set) var cachedRepos: [Repo]?
+
     private init() {
-        if let data = UserDefaults.standard.data(forKey: Self.profileKey), Self.readToken() != nil {
+        if let data = UserDefaults.standard.data(forKey: Self.profileKey) {
             profile = try? JSONDecoder().decode(Profile.self, from: data)
         }
+        // Make sure the saved sign-in still has its token, without blocking launch.
+        Task { if await currentToken() == nil { profile = nil } }
+    }
+
+    private var tokenLoad: Task<String?, Never>?
+
+    private func currentToken() async -> String? {
+        if tokenRead { return token }
+        // Everyone asking at once shares one keychain read.
+        let load = tokenLoad ?? Task.detached(priority: .userInitiated) { Self.readToken() }
+        tokenLoad = load
+        let value = await load.value
+        if !tokenRead { token = value; tokenRead = true }
+        return token
     }
 
     // MARK: Sign in and out
@@ -70,7 +92,9 @@ final class GitHubAccount: ObservableObject {
 
                 let token = try await Self.waitForToken(clientID: clientID, code: code)
                 let profile = try await Self.fetchProfile(token: token)
-                Self.saveToken(token)
+                self?.token = token
+                self?.tokenRead = true
+                await Task.detached { Self.saveToken(token) }.value
                 UserDefaults.standard.set(try? JSONEncoder().encode(profile), forKey: Self.profileKey)
                 self?.profile = profile
                 self?.pending = nil
@@ -92,9 +116,120 @@ final class GitHubAccount: ObservableObject {
     }
 
     func signOut() {
-        Self.deleteToken()
+        token = nil
+        tokenRead = true
+        cachedRepos = nil
+        Task.detached { Self.deleteToken() }
         UserDefaults.standard.removeObject(forKey: Self.profileKey)
         profile = nil
+    }
+
+    // MARK: Repos
+
+    struct Repo: Decodable, Identifiable, Equatable {
+        let full_name: String
+        let name: String
+        let html_url: String
+        let clone_url: String
+        let `private`: Bool
+        let pushed_at: Date?
+        let description: String?
+        var id: String { full_name }
+    }
+
+    /// Your repos on GitHub, most recently pushed first.
+    func repos(refresh: Bool = false) async throws -> [Repo] {
+        if !refresh, let cachedRepos { return cachedRepos }
+        guard let token = await currentToken() else { return [] }
+        var request = URLRequest(url: URL(string: "https://api.github.com/user/repos?sort=pushed&per_page=50")!)
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw Failure(message: "Couldn't load your GitHub repos. Try again in a moment.")
+        }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let repos = try decoder.decode([Repo].self, from: data)
+        cachedRepos = repos
+        return repos
+    }
+
+    // MARK: New repos
+
+    /// Whether the saved sign-in may create repos. Sign-ins from before Critique
+    /// could create repos only have read access; signing in again upgrades them.
+    func canCreateRepos() async -> Bool {
+        guard let (_, http) = try? await api("GET", "/user") else { return false }
+        let scopes = (http.value(forHTTPHeaderField: "X-OAuth-Scopes") ?? "")
+            .split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        return scopes.contains("repo") || scopes.contains("public_repo")
+    }
+
+    /// Why a repo name can't be used, or nil if GitHub would accept it as typed.
+    /// GitHub allows letters, digits, `-`, `_` and `.`, up to 100 characters.
+    nonisolated static func nameProblem(_ name: String) -> String? {
+        if name.isEmpty { return "" }
+        if name.count > 100 { return "Names can be up to 100 characters." }
+        if name == "." || name == ".." { return "That name is reserved." }
+        let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.")
+        if name.unicodeScalars.contains(where: { !allowed.contains($0) }) {
+            return "Use only letters, numbers, - _ and ."
+        }
+        return nil
+    }
+
+    /// True if you don't have a repo with this name yet (GitHub ignores case).
+    func isNameAvailable(_ name: String) async throws -> Bool {
+        guard let login = profile?.login else { throw Failure(message: "Sign in with GitHub first.") }
+        let encoded = name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? name
+        let (_, http) = try await api("GET", "/repos/\(login)/\(encoded)")
+        switch http.statusCode {
+        case 404: return true
+        case 200..<400: return false
+        default: throw Failure(message: "Couldn't check that name. Try again in a moment.")
+        }
+    }
+
+    /// Creates a repo under your account with a README, so it has a `main` branch to clone.
+    func createRepo(name: String, description: String, isPrivate: Bool) async throws -> Repo {
+        var body: [String: Any] = ["name": name, "private": isPrivate, "auto_init": true]
+        if !description.isEmpty { body["description"] = description }
+        let (data, http) = try await api("POST", "/user/repos", json: body)
+        switch http.statusCode {
+        case 201:
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            let repo = try decoder.decode(Repo.self, from: data)
+            cachedRepos = [repo] + (cachedRepos ?? [])
+            return repo
+        case 422: throw Failure(message: "You already have a repo called \(name) on GitHub.")
+        case 401, 403, 404: throw Failure(message: "GitHub didn't allow Critique to create repos. Sign in again to give it access.")
+        default: throw Failure(message: "GitHub couldn't create the repo. Try again in a moment.")
+        }
+    }
+
+    /// An Authorization header git can use to clone a private repo you just made.
+    /// Passed on the command line only, never written to the repo's config.
+    func gitAuthHeader() async -> String? {
+        guard let token = await currentToken() else { return nil }
+        return "Authorization: Basic " + Data("x-access-token:\(token)".utf8).base64EncodedString()
+    }
+
+    private func api(_ method: String, _ path: String, json: [String: Any]? = nil) async throws -> (Data, HTTPURLResponse) {
+        guard let token = await currentToken() else { throw Failure(message: "Sign in with GitHub first.") }
+        var request = URLRequest(url: URL(string: "https://api.github.com" + path)!)
+        request.httpMethod = method
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        if let json {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONSerialization.data(withJSONObject: json)
+        }
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw Failure(message: "GitHub didn't answer.") }
+        return (data, http)
     }
 
     // MARK: GitHub device flow
@@ -119,9 +254,12 @@ final class GitHubAccount: ObservableObject {
         var errorDescription: String? { message }
     }
 
+    /// `repo` lets Critique create repos for you (and see your private ones).
+    private static let scope = "read:user user:email repo"
+
     private static func requestDeviceCode(clientID: String) async throws -> DeviceCode {
         try await post("https://github.com/login/device/code",
-                       ["client_id": clientID, "scope": "read:user user:email"])
+                       ["client_id": clientID, "scope": Self.scope])
     }
 
     private static func waitForToken(clientID: String, code: DeviceCode) async throws -> String {
@@ -185,20 +323,20 @@ final class GitHubAccount: ObservableObject {
 
     // MARK: Keychain
 
-    private static var tokenQuery: [String: Any] {
+    nonisolated private static var tokenQuery: [String: Any] {
         [kSecClass as String: kSecClassGenericPassword,
          kSecAttrService as String: keychainService,
          kSecAttrAccount as String: "token"]
     }
 
-    private static func saveToken(_ token: String) {
+    nonisolated private static func saveToken(_ token: String) {
         SecItemDelete(tokenQuery as CFDictionary)
         var item = tokenQuery
         item[kSecValueData as String] = Data(token.utf8)
         SecItemAdd(item as CFDictionary, nil)
     }
 
-    private static func readToken() -> String? {
+    nonisolated private static func readToken() -> String? {
         var query = tokenQuery
         query[kSecReturnData as String] = true
         var result: CFTypeRef?
@@ -206,7 +344,7 @@ final class GitHubAccount: ObservableObject {
         return String(data: data, encoding: .utf8)
     }
 
-    private static func deleteToken() {
+    nonisolated private static func deleteToken() {
         SecItemDelete(tokenQuery as CFDictionary)
     }
 }

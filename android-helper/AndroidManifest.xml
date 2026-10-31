@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Critique's phone helper: a Quick Settings tile that starts and sends a
+     critique. Critique on the Mac does all the recording over adb. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="dev.critique.mobile"
+    android:versionCode="1"
+    android:versionName="0.1.0">
+
+    <application android:label="Critique" android:icon="@drawable/ic_tile" android:allowBackup="false">
+        <service
+            android:name=".CritiqueTile"
+            android:exported="true"
+            android:icon="@drawable/ic_tile"
+            android:label="Critique"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <!-- The Mac tells the tile what it's doing: adb shell am broadcast -n dev.critique.mobile/.StateReceiver -\-es state recording -->
+        <receiver android:name=".StateReceiver" android:exported="true" />
+    </application>
+</manifest>

@@ -4,17 +4,23 @@ import Speech
 import SwiftUI
 
 /// Shared layout for the simple pages: a title, a subtitle, then content.
-struct PageScaffold<Content: View>: View {
+struct PageScaffold<Content: View, Accessory: View>: View {
     let title: String
     let subtitle: String
+    /// Sits at the top right, next to the title.
+    @ViewBuilder let accessory: Accessory
     @ViewBuilder let content: Content
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(title).font(.system(size: 26, weight: .medium))
-                    Text(subtitle).font(.system(size: 14)).foregroundStyle(Theme.secondary)
+                HStack(alignment: .top, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(title).font(.system(size: 26, weight: .medium))
+                        Text(subtitle).font(.system(size: 14)).foregroundStyle(Theme.secondary)
+                    }
+                    Spacer(minLength: 0)
+                    accessory
                 }
                 .padding(.top, 8)
                 content
@@ -24,6 +30,12 @@ struct PageScaffold<Content: View>: View {
             .frame(maxWidth: 760, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+}
+
+extension PageScaffold where Accessory == EmptyView {
+    init(title: String, subtitle: String, @ViewBuilder content: () -> Content) {
+        self.init(title: title, subtitle: subtitle, accessory: { EmptyView() }, content: content)
     }
 }
 
@@ -44,7 +56,7 @@ struct GuidePage: View {
         PageScaffold(title: "Guide", subtitle: "Everything Critique does, on one page.") {
             section("Keys")
             RowList {
-                keyRow([.option, .option], "Double-tap right option to start. Do it again to send.")
+                keyRow([.backtick, .backtick], "Double-tap ` to start. Do it again to send.")
                 Divider().overlay(Theme.border)
                 keyRow([.backtick], "Hold and move the mouse to draw. Each drawing takes a screenshot.")
                 Divider().overlay(Theme.border)
@@ -127,7 +139,7 @@ struct PermissionsPage: View {
             pane: "Privacy_Microphone",
             granted: { AVCaptureDevice.authorizationStatus(for: .audio) == .authorized && SFSpeechRecognizer.authorizationStatus() == .authorized },
             request: { Task { _ = await Dictation.authorize() } }),
-        Row(feature: .doubleTap, name: "Input Monitoring", why: "Start and send with a right ⌥ double-tap",
+        Row(feature: .doubleTap, name: "Input Monitoring", why: "Start and send with a ` double-tap",
             pane: "Privacy_ListenEvent", granted: { CGPreflightListenEventAccess() },
             request: { CGRequestListenEventAccess() }),
         Row(feature: .accessibility, name: "Accessibility", why: "Name the buttons you touch, and type into Claude Code for you",
@@ -298,7 +310,7 @@ struct AccountPage: View {
 }
 
 /// Shows the one-time code while you approve the sign-in on github.com.
-private struct DeviceCodeSheet: View {
+struct DeviceCodeSheet: View {
     let pending: GitHubAccount.Pending
     let cancel: () -> Void
 

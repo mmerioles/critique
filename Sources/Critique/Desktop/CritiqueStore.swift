@@ -9,6 +9,10 @@ final class CritiqueStore: ObservableObject {
         let record: FeedbackRecord
         var id: String { record.id }
 
+        /// Changes since this critique can be undone (or redone).
+        var canRewind: Bool { record.project != nil && record.before != nil }
+        var isUndone: Bool { record.redo != nil }
+
         /// Screenshots you marked up (older critiques also had an opening screenshot, #1).
         var pointedShots: [FeedbackRecord.ShotRecord] {
             record.shots.filter { $0.kind != "screen" }
@@ -29,13 +33,53 @@ final class CritiqueStore: ObservableObject {
         }
     }
 
+    /// Reads every critique's feedback.json, off the main thread so a big inbox
+    /// never stalls the window.
     func reload() {
-        items = Inbox.items().compactMap { dir in Inbox.load(dir).map { Item(dir: dir, record: $0) } }
+        loading?.cancel()
+        loading = Task {
+            let fresh = await Task.detached(priority: .userInitiated) {
+                Inbox.items().compactMap { dir in Inbox.load(dir).map { Item(dir: dir, record: $0) } }
+            }.value
+            if !Task.isCancelled { items = fresh }
+        }
     }
+    private var loading: Task<Void, Never>?
 
     func delete(_ item: Item) {
+        if let project = item.record.project, item.record.before != nil {
+            let repo = URL(fileURLWithPath: project.path), name = item.record.id
+            Task.detached(priority: .utility) { Rewind.forget(repo, name: name) }
+        }
         try? FileManager.default.trashItem(at: item.dir, resultingItemURL: nil)
         reload()
+    }
+
+    /// Puts the project back to how it was before this critique. Returns an error to show, or nil.
+    func undo(_ item: Item) async -> String? {
+        guard let project = item.record.project, let before = item.record.before else { return "No snapshot" }
+        return await rewind(item, repo: URL(fileURLWithPath: project.path), to: before, undoing: true)
+    }
+
+    /// Brings back the changes an undo removed.
+    func redo(_ item: Item) async -> String? {
+        guard let project = item.record.project, let redo = item.record.redo else { return nil }
+        return await rewind(item, repo: URL(fileURLWithPath: project.path), to: redo, undoing: false)
+    }
+
+    private func rewind(_ item: Item, repo: URL, to point: Rewind.Point, undoing: Bool) async -> String? {
+        let name = item.record.id + "-redo"
+        let result = await Task.detached(priority: .userInitiated) {
+            Result { try Rewind.restore(repo, to: point, name: name) }
+        }.value
+        var record = item.record
+        switch result {
+        case .success(let now): record.redo = undoing ? now : nil
+        case .failure(let error): return error.localizedDescription
+        }
+        try? Inbox.save(record, in: item.dir)
+        if let i = items.firstIndex(where: { $0.id == item.id }) { items[i] = Item(dir: item.dir, record: record) }
+        return nil
     }
 
     /// Reload when a critique folder is added or removed.

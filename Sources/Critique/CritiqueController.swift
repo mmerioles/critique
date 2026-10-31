@@ -3,7 +3,7 @@ import AVFoundation
 import Carbon.HIToolbox
 import Speech
 
-/// Runs a feedback session. Double-tap right Option to start, then just talk and
+/// Runs a feedback session. Double-tap ` to start, then just talk and
 /// point with your cursor; hold ` to draw on the screen. Double-tap again to send.
 /// (⌃⌥Space also works; esc cancels.)
 ///
@@ -20,7 +20,7 @@ final class CritiqueController {
     private let pointer = PointerTracker()
     private let recorder = ScreenRecorder()
     let handoff = AgentHandoff()
-    private var trigger: RightOptionTap?
+    private var trigger: BacktickTap?
     private var sessionKeys: [UInt32] = []
     private var hideWork: DispatchWorkItem?
     private var sending = false
@@ -38,7 +38,7 @@ final class CritiqueController {
         pointer.onGesture = { [weak self] gesture, p, since in self?.capture(gesture, at: p, since: since) }
         pointer.onHover = { [weak self] p in self?.hovered(p) }
 
-        trigger = RightOptionTap { [weak self] in
+        trigger = BacktickTap(inSession: { [weak self] in self?.session.isActive ?? false }) { [weak self] in
             if Feature.doubleTap.isOn { self?.toggle() }
         }
         // Backup trigger that works even without Input Monitoring permission.
@@ -56,6 +56,8 @@ final class CritiqueController {
         hideWork?.cancel()
         session.reset()
         session.mode = .listening
+        // Get the agent going now, so it's ready by the time you send.
+        Agents.shared.ensureRunning()
         let screen = ScreenCapture.screenUnderMouse()
         bar.show(on: screen)
         play("Pop")
@@ -184,7 +186,7 @@ final class CritiqueController {
         }
     }
 
-    private func finishSending(_ result: Result<(dir: URL, record: FeedbackRecord), Error>) {
+    func finishSending(_ result: Result<(dir: URL, record: FeedbackRecord), Error>) {
         sending = false
         switch result {
         case .success(let (dir, record)):
@@ -199,6 +201,23 @@ final class CritiqueController {
             sending = true // hold off new sessions until the paste is done
             let path = dir.appendingPathComponent("feedback.md").path
             let line = "Implement my UX feedback from Critique: \(path) (\(summary)). Read it and look at the screenshots first."
+            // The main agent Critique runs gets it directly, told which project it's for.
+            // Starts it first if it isn't running (unless you turned that off).
+            if let master = Agents.shared.ensureRunning() {
+                var forMaster = line
+                if let project = record.project { forMaster += " It's for \(project.name), in \(project.path)." }
+                if Agents.shared.send(forMaster) {
+                    sending = false
+                    let place = record.project?.name.split(separator: "/").last.map(String.init)
+                    let to = "\(master.kind.name)\(place.map { " for \($0)" } ?? "")"
+                    switch master.status {
+                    case .starting: notice(nil, sent: "Starting \(to) — it'll pick this up in a moment", seconds: 3)
+                    case .needsYou: notice(nil, sent: "\(master.kind.name) needs you first — open it on the Agent page", seconds: 4)
+                    default: notice(nil, sent: "Sent to \(to)", seconds: 2.4)
+                    }
+                    return
+                }
+            }
             handoff.deliver(line: line) { [weak self] app in
                 guard let self else { return }
                 self.sending = false
