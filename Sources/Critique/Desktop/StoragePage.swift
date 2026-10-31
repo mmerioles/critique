@@ -42,7 +42,7 @@ struct StoragePage: View {
                 ProgressView().controlSize(.small)
             }
         }
-        .task(id: store.items.map(\.id)) { usage = await StorageUsage.measure() }
+        .task(id: store.total) { usage = await StorageUsage.measure() }
     }
 
     // MARK: Sections

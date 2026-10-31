@@ -201,6 +201,18 @@ enum Inbox {
         return try? decoder.decode(FeedbackRecord.self, from: data)
     }
 
+    /// Just the counts the stats need, without keeping the whole record.
+    static func summary(_ dir: URL) -> (shots: Int, seconds: Double)? {
+        struct Light: Decodable {
+            struct Shot: Decodable {}
+            var shots: [Shot]
+            var duration: Double?
+        }
+        guard let data = try? Data(contentsOf: dir.appendingPathComponent("feedback.json")),
+              let light = try? decoder.decode(Light.self, from: data) else { return nil }
+        return (light.shots.count, light.duration ?? 0)
+    }
+
     static func save(_ record: FeedbackRecord, in dir: URL) throws {
         try encoder.encode(record).write(to: dir.appendingPathComponent("feedback.json"))
         try record.markdown(in: dir).write(to: dir.appendingPathComponent("feedback.md"), atomically: true, encoding: .utf8)

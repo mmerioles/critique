@@ -7,7 +7,6 @@ struct CritiquesPage: View {
     @ObservedObject var store: CritiqueStore
     let handoff: AgentHandoff
     @State private var search = ""
-    @State private var searching = false
     @State private var preview: Preview?
 
     struct Preview: Identifiable {
@@ -16,15 +15,13 @@ struct CritiquesPage: View {
         var id: URL { url }
     }
 
-    private var filtered: [CritiqueStore.Item] {
-        let query = search.trimmingCharacters(in: .whitespaces)
-        guard !query.isEmpty else { return store.items }
-        return store.items.filter { $0.record.notes.localizedCaseInsensitiveContains(query) }
-    }
+    /// Search results while searching, otherwise the newest page.
+    private var shown: [CritiqueStore.Item] { store.results ?? store.items }
+    private var isQuery: Bool { !search.trimmingCharacters(in: .whitespaces).isEmpty }
 
     private var days: [(title: String, items: [CritiqueStore.Item])] {
         let calendar = Calendar.current
-        let groups = Dictionary(grouping: filtered) { calendar.startOfDay(for: $0.record.createdAt) }
+        let groups = Dictionary(grouping: shown) { calendar.startOfDay(for: $0.record.createdAt) }
         return groups.keys.sorted(by: >).map { day in
             let title: String
             if calendar.isDateInToday(day) { title = "TODAY" }
@@ -43,22 +40,24 @@ struct CritiquesPage: View {
 
                 HStack(alignment: .top, spacing: 20) {
                     Banner()
-                    Stats(items: store.items)
+                    Stats(totals: store.totals)
                         .frame(width: 250)
                 }
 
-                if store.items.isEmpty {
+                if store.total == 0 {
                     EmptyState()
                 } else {
+                    searchField
+                    if isQuery, let results = store.results, results.isEmpty, !store.isSearching {
+                        Text("No critiques match “\(search.trimmingCharacters(in: .whitespaces))”.")
+                            .font(.system(size: 14)).foregroundStyle(Theme.secondary)
+                            .frame(maxWidth: .infinity).padding(.vertical, 24)
+                    }
                     ForEach(days, id: \.title) { day in
                         VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                Text(day.title)
-                                    .font(.system(size: 12, weight: .medium)).kerning(1.2)
-                                    .foregroundStyle(Theme.secondary)
-                                Spacer()
-                                if day.title == days.first?.title { searchControl }
-                            }
+                            Text(day.title)
+                                .font(.system(size: 12, weight: .medium)).kerning(1.2)
+                                .foregroundStyle(Theme.secondary)
                             VStack(spacing: 0) {
                                 ForEach(Array(day.items.enumerated()), id: \.element.id) { index, item in
                                     if index > 0 { Divider().overlay(Theme.border) }
@@ -72,6 +71,7 @@ struct CritiquesPage: View {
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
                     }
+                    footer
                 }
             }
             .padding(.horizontal, 44)
@@ -80,20 +80,51 @@ struct CritiquesPage: View {
             .frame(maxWidth: .infinity)
         }
         .sheet(item: $preview) { PreviewSheet(preview: $0) }
+        .onChange(of: search) { _, text in store.search(text) }
     }
 
-    @ViewBuilder private var searchControl: some View {
-        if searching {
-            TextField("Search critiques", text: $search)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 220)
-                .onExitCommand { searching = false; search = "" }
-        } else {
-            Button { searching = true } label: {
-                Image(systemName: "magnifyingglass").foregroundStyle(Theme.secondary)
+    /// Always there above the list: words, a project, or a time.
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass").foregroundStyle(Theme.secondary)
+            TextField("Search by what you said, project or time — “tabs”, “yesterday”, “oct 30”", text: $search)
+                .textFieldStyle(.plain)
+                .font(.system(size: 14))
+                .onExitCommand { search = "" }
+            if store.isSearching {
+                ProgressView().controlSize(.small)
+            } else if isQuery {
+                Button { search = "" } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(Theme.tertiary)
+                }
+                .buttonStyle(.plain)
+                .help("Clear search")
+            }
+        }
+        .padding(.horizontal, 14)
+        .frame(height: 40)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Theme.panel))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Theme.border))
+    }
+
+    /// Under the list: how many older critiques there are, and a way to them.
+    @ViewBuilder private var footer: some View {
+        if isQuery {
+            if let results = store.results, results.count >= CritiqueStore.maxResults {
+                Text("Showing the newest \(CritiqueStore.maxResults) matches. Add a word to narrow it down.")
+                    .font(.system(size: 13)).foregroundStyle(Theme.secondary)
+                    .frame(maxWidth: .infinity)
+            }
+        } else if store.hasMore {
+            Button { store.showMore() } label: {
+                Text("Show \(min(CritiqueStore.morePage, store.remaining)) more · \(store.remaining) older")
+                    .font(.system(size: 13, weight: .medium))
+                    .padding(.horizontal, 16).frame(height: 34)
+                    .background(Capsule().fill(Theme.panel))
+                    .overlay(Capsule().strokeBorder(Theme.border))
             }
             .buttonStyle(.plain)
-            .help("Search critiques")
+            .frame(maxWidth: .infinity)
         }
     }
 
@@ -125,14 +156,13 @@ private struct Banner: View {
 }
 
 private struct Stats: View {
-    let items: [CritiqueStore.Item]
+    let totals: CritiqueStore.Totals
 
     var body: some View {
-        let shots = items.reduce(0) { $0 + $1.record.shots.count }
-        let seconds = items.reduce(0.0) { $0 + ($1.record.duration ?? 0) }
+        let seconds = totals.seconds
         VStack(alignment: .leading, spacing: 10) {
-            stat("\(items.count)", "critiques")
-            stat("\(shots)", "screenshots")
+            stat("\(totals.critiques)", "critiques")
+            stat("\(totals.shots)", "screenshots")
             stat(seconds < 60 ? "\(Int(seconds))s" : "\(Int(seconds / 60))m", "recorded")
         }
         .padding(22)

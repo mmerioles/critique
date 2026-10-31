@@ -19,9 +19,31 @@ final class CritiqueStore: ObservableObject {
         }
     }
 
+    /// The newest critiques, a page at a time: only these are held in memory.
     @Published private(set) var items: [Item] = []
+    /// Every critique on disk, counted without keeping their records.
+    @Published private(set) var total = 0
+    @Published private(set) var totals = Totals()
+    /// Search results, or nil when there's no search. Only matches are kept.
+    @Published private(set) var results: [Item]?
+    @Published private(set) var isSearching = false
+
+    struct Totals { var critiques = 0, shots = 0, seconds = 0.0 }
+
+    nonisolated static let pageSize = 5
+    nonisolated static let morePage = 10
+    /// A search keeps at most this many matches, newest first.
+    nonisolated static let maxResults = 50
+
+    private var shown = pageSize
+    var hasMore: Bool { items.count < total }
+    var remaining: Int { max(0, total - items.count) }
+
     private var watcher: DispatchSourceFileSystemObject?
     private var pending: DispatchWorkItem?
+    /// Shots and seconds per critique folder, so stats don't re-read every file.
+    private var summaries: [String: (shots: Int, seconds: Double)] = [:]
+    private var query = ""
 
     static let didSave = Notification.Name("CritiqueDidSave")
 
@@ -33,18 +55,86 @@ final class CritiqueStore: ObservableObject {
         }
     }
 
-    /// Reads every critique's feedback.json, off the main thread so a big inbox
-    /// never stalls the window.
+    /// Lists the inbox, reads only the newest `shown` critiques in full, and
+    /// counts the rest from a small summary, all off the main thread.
     func reload() {
         loading?.cancel()
+        let shown = shown, known = summaries
         loading = Task {
-            let fresh = await Task.detached(priority: .userInitiated) {
-                Inbox.items().compactMap { dir in Inbox.load(dir).map { Item(dir: dir, record: $0) } }
+            let (page, all, fresh) = await Task.detached(priority: .userInitiated) {
+                let dirs = Inbox.items()
+                let page = dirs.prefix(shown).compactMap { dir in Inbox.load(dir).map { Item(dir: dir, record: $0) } }
+                var fresh: [String: (shots: Int, seconds: Double)] = [:]
+                for dir in dirs {
+                    let key = dir.lastPathComponent
+                    if let hit = known[key] { fresh[key] = hit; continue }
+                    if let s = Inbox.summary(dir) { fresh[key] = s }
+                }
+                return (page, dirs.count, fresh)
             }.value
-            if !Task.isCancelled { items = fresh }
+            guard !Task.isCancelled else { return }
+            items = page
+            total = all
+            summaries = fresh
+            totals = Totals(critiques: all,
+                            shots: fresh.values.reduce(0) { $0 + $1.shots },
+                            seconds: fresh.values.reduce(0) { $0 + $1.seconds })
+            if !query.isEmpty { search(query) }
         }
     }
     private var loading: Task<Void, Never>?
+
+    /// Reads the next few older critiques from disk.
+    func showMore() {
+        shown = items.count + Self.morePage
+        reload()
+    }
+
+    /// Finds critiques by words, project, phone or time ("yesterday", "oct 30",
+    /// "2:06am"). Scans the files in the background; only matches stay in memory.
+    func search(_ text: String) {
+        query = text.trimmingCharacters(in: .whitespaces)
+        searchTask?.cancel()
+        guard !query.isEmpty else { results = nil; isSearching = false; return }
+        let tokens = query.lowercased().split(whereSeparator: \.isWhitespace).map(String.init)
+        isSearching = true
+        searchTask = Task {
+            try? await Task.sleep(for: .milliseconds(200))   // wait out typing
+            guard !Task.isCancelled else { return }
+            let found = await Task.detached(priority: .userInitiated) {
+                var found: [Item] = []
+                for dir in Inbox.items() {
+                    if Task.isCancelled || found.count >= Self.maxResults { break }
+                    guard let record = Inbox.load(dir), Self.matches(record, tokens) else { continue }
+                    found.append(Item(dir: dir, record: record))
+                }
+                return found
+            }.value
+            guard !Task.isCancelled else { return }
+            results = found
+            isSearching = false
+        }
+    }
+    private var searchTask: Task<Void, Never>?
+
+    /// Every word must appear in what was said, the project, the phone or the
+    /// critique's date and time, written the ways people type them.
+    nonisolated static func matches(_ record: FeedbackRecord, _ tokens: [String]) -> Bool {
+        let d = record.createdAt, cal = Calendar.current
+        let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX")
+        func fmt(_ p: String) -> String { f.dateFormat = p; return f.string(from: d).lowercased() }
+        var words = [record.notes, record.project?.name ?? "", record.device?.model ?? "", record.device?.app ?? "",
+                     fmt("EEEE"), fmt("MMM d"), fmt("MMMM d"), fmt("M/d"), fmt("h:mma"), fmt("h:mm a"), fmt("ha"), fmt("yyyy")]
+        if cal.isDateInToday(d) { words.append("today") }
+        if cal.isDateInYesterday(d) { words.append("yesterday") }
+        let hay = words.joined(separator: " ").lowercased()
+        return tokens.allSatisfy { hay.contains($0) }
+    }
+
+    private func replace(_ item: Item) {
+        if let i = items.firstIndex(where: { $0.id == item.id }) { items[i] = item }
+        if let i = results?.firstIndex(where: { $0.id == item.id }) { results?[i] = item }
+    }
 
     func delete(_ item: Item) {
         if let project = item.record.project, item.record.before != nil {
@@ -52,6 +142,7 @@ final class CritiqueStore: ObservableObject {
             Task.detached(priority: .utility) { Rewind.forget(repo, name: name) }
         }
         try? FileManager.default.trashItem(at: item.dir, resultingItemURL: nil)
+        results?.removeAll { $0.id == item.id }
         reload()
     }
 
@@ -78,7 +169,7 @@ final class CritiqueStore: ObservableObject {
         case .failure(let error): return error.localizedDescription
         }
         try? Inbox.save(record, in: item.dir)
-        if let i = items.firstIndex(where: { $0.id == item.id }) { items[i] = Item(dir: item.dir, record: record) }
+        replace(Item(dir: item.dir, record: record))
         return nil
     }
 
