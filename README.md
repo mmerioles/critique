@@ -72,6 +72,8 @@ The **Mobile** page lets you critique an Android app while you hold the phone.
 3. Tap the tile, use the app and talk, tap it again to send. Critique records the phone's screen and mic over adb ([scrcpy](https://github.com/Genymobile/scrcpy), `brew install scrcpy`), and each tap becomes a screenshot with a ring where your finger was.
 4. When the agent is done, Critique runs `./gradlew installDebug` for the project and reopens the app on your phone.
 
+**See your phone on your Mac.** Once a phone is paired, switch on **Show phone screen** on the Mobile page to stream it live (about a tenth of a second behind). Click **Full screen**, or double-click the picture, to watch it full screen; switch it off when you're done. It uses scrcpy's phone-side server over adb and decodes the H.264 stream on your Mac, so it runs alongside a critique recording.
+
 The helper's source is in `android-helper/` (`make helper` rebuilds it).
 
 ## Getting feedback to your agent

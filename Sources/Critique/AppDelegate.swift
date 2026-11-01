@@ -61,6 +61,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Clicking the Dock icon brings the window back.
     /// critique:// links (like "Return to Critique" on the sign-in page) bring the window forward.
     /// Agents run inside Critique, so quitting stops them. Check first.
+    func applicationWillTerminate(_ notification: Notification) {
+        // the phone mirror's adb process and port forward go with us
+        PhoneMirror.shared.stop()
+    }
+
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         let count = Agents.shared.running.count
         guard count > 0 else { return .terminateNow }

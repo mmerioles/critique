@@ -6,6 +6,7 @@ import SwiftUI
 struct MobilePage: View {
     @ObservedObject private var mobile = Mobile.shared
     @ObservedObject private var projects = Projects.shared
+    @ObservedObject private var mirror = PhoneMirror.shared
     @State private var now = Date()
     @State private var pairing = false
     @State private var busy: String?
@@ -18,6 +19,7 @@ struct MobilePage: View {
         PageScaffold(title: "Mobile", subtitle: "Critique an Android app from your phone, and get the fix back on it.") {
             card { phoneSection }
             if mobile.device != nil {
+                card { screenSection }
                 card { setupSection }
                 sessionStatus
                 card { installSection }
@@ -76,6 +78,78 @@ struct MobilePage: View {
         case "unauthorized": "Allow debugging on the phone's screen"
         case "offline": "Offline: turn Wireless debugging off and on again"
         default: state
+        }
+    }
+
+    // MARK: Phone screen — the phone, live on this Mac
+
+    @ViewBuilder private var screenSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            row("rectangle.on.rectangle", "Show phone screen", screenDetail) {
+                HStack(spacing: 10) {
+                    if mirror.state == .live {
+                        Button {
+                            mirror.openFullScreen()
+                        } label: {
+                            Label("Full screen", systemImage: "arrow.up.left.and.arrow.down.right")
+                        }
+                        .help("Show your phone's screen full screen (Esc or ⌃⌘F to leave)")
+                    }
+                    Toggle("", isOn: Binding(
+                        get: { mirror.isOn },
+                        set: { on in on ? mobile.device.map(mirror.start) : mirror.stop() }))
+                        .toggleStyle(.switch)
+                        .labelsHidden()
+                        .tint(Theme.red)
+                        .disabled(!hasScrcpy)
+                        .help(hasScrcpy ? "Stream your phone's screen to this Mac" : "Needs scrcpy (install it below)")
+                }
+            }
+            if mirror.isOn {
+                mirrorView
+            }
+        }
+        // a different phone was chosen: the stream belongs to the old one
+        .onChange(of: mobile.device?.serial) { _, serial in
+            if mirror.isOn, mirror.serial != serial { mirror.stop() }
+        }
+    }
+
+    private var screenDetail: String {
+        switch mirror.state {
+        case .off: "Stream your phone to this Mac while you test. Turns off when you switch it off or the phone disconnects."
+        case .starting: "Connecting to your phone…"
+        case .live: mirror.placement == .window ? "Showing in its own window." : "Live from \(mobile.device?.model ?? "your phone")."
+        case .failed(let message): message
+        }
+    }
+
+    @ViewBuilder private var mirrorView: some View {
+        let ratio = mirror.videoSize.map { $0.width / max($0.height, 1) } ?? (1080.0 / 2340.0)
+        HStack {
+            Spacer(minLength: 0)
+            ZStack {
+                if mirror.placement == .inline {
+                    MirrorHost(placement: .inline)
+                } else {
+                    Color.black
+                    VStack(spacing: 10) {
+                        Image(systemName: "macwindow").font(.system(size: 22)).foregroundStyle(.white.opacity(0.6))
+                        Text("Showing full screen").font(.system(size: 12)).foregroundStyle(.white.opacity(0.7))
+                    }
+                }
+                if mirror.state == .starting {
+                    Color.black
+                    ProgressView().controlSize(.small).tint(.white)
+                }
+            }
+            .aspectRatio(ratio, contentMode: .fit)
+            .frame(maxHeight: ratio < 1 ? 560 : 360)
+            .clipShape(RoundedRectangle(cornerRadius: ratio < 1 ? 22 : 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: ratio < 1 ? 22 : 12, style: .continuous).strokeBorder(Theme.border))
+            .onTapGesture(count: 2) { mirror.openFullScreen() }
+            .help("Double-click for full screen")
+            Spacer(minLength: 0)
         }
     }
 
