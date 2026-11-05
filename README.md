@@ -104,6 +104,8 @@ Click **Check for Updates** (or the refresh button on a repo) to fetch from GitH
 
 The Agent tab runs one main agent (Claude Code, Codex or Gemini CLI, with the model you pick) in your projects folder: `~/repos` unless you choose another. It runs in the background with no window. **Show** opens its terminal, and closing that window keeps it running. Every critique goes to it along with the project it's for, so it can work in any of your repos. It stops when you quit Critique.
 
+Claude Code runs **headless** by default: no terminal, one `claude -p` session per project in that project's folder, which Critique talks to over JSON and picks up again (`--resume`) after a restart. Each session starts with the first critique for its project and gets the whole feedback as its message. **Show** opens a transcript of what it was told, said and did. Switch Headless off on the Agent tab for a real terminal session at the top of your projects folder; there, Critique learns the session's status from Claude Code hooks (passed with `--settings`, alongside your own) rather than by reading its screen.
+
 The top of the tab shows your Claude plan usage, the 5-hour window and the week, the same numbers as `/usage`. It reads Claude Code's saved sign-in from your keychain.
 
 ## Releasing

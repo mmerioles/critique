@@ -145,9 +145,10 @@ final class Mobile: ObservableObject {
             ADB.setTile(recording.device.serial, "idle")
             switch result {
             case .success(let saved):
+                let sent = Date()
                 deliver?(.success(saved))
                 if autoInstall, let project = saved.record.project {
-                    installAfterAgent(project: project, serial: recording.device.serial, package: recording.package)
+                    installAfterAgent(project: project, serial: recording.device.serial, package: recording.package, since: sent)
                 }
             case .failure(let error):
                 notice?(error.localizedDescription)
@@ -183,9 +184,9 @@ final class Mobile: ObservableObject {
 
     private var installTask: Task<Void, Never>?
 
-    /// Waits for the agent to start and then finish on this critique, then
-    /// builds and installs the app if anything changed.
-    private func installAfterAgent(project: FeedbackRecord.ProjectRecord, serial: String, package: String?) {
+    /// Waits for the agent to start and then finish on this critique (sent at
+    /// `since`), then builds and installs the app if anything changed.
+    private func installAfterAgent(project: FeedbackRecord.ProjectRecord, serial: String, package: String?, since: Date) {
         let dir = URL(fileURLWithPath: project.path)
         guard let gradle = Installer.gradleProject(in: dir) else {
             installer = .failed("No Gradle project in \(project.name), so nothing to reinstall")
@@ -195,18 +196,13 @@ final class Mobile: ObservableObject {
         let before = Installer.snapshot(dir)
         installer = .waiting("Waiting for the agent to finish…")
         installTask = Task {
-            // Wait for it to pick the critique up (or give up after 3 minutes)…
-            var sawWork = false
-            for _ in 0..<180 where !Task.isCancelled {
-                if Agents.shared.master?.status == .working { sawWork = true; break }
-                try? await Task.sleep(for: .seconds(1))
-            }
-            // …then for it to settle: ready for 6 seconds straight.
-            var readyFor = 0
-            while sawWork, readyFor < 6, !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(1))
-                guard let agent = Agents.shared.master else { break }
-                readyFor = agent.status == .ready ? readyFor + 1 : 0
+            // The agent says when it's done with the turn the critique started (it
+            // gives up if nothing starts in 3 minutes). With no agent of our own,
+            // give whatever picked it up over MCP the same 3 minutes.
+            if let agent = Agents.shared.agent(for: project) {
+                _ = await agent.turnFinished(after: since)
+            } else {
+                try? await Task.sleep(for: .seconds(180))
             }
             guard !Task.isCancelled else { return }
             guard Installer.snapshot(dir) != before else {
