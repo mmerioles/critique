@@ -66,7 +66,8 @@ struct AgentModel: Hashable, Identifiable {
 }
 
 /// The Claude models your account can use, newest first, and which one Claude Code
-/// uses by default. Loaded with the sign-in Claude Code already saved, like usage.
+/// uses by default. Loaded through ClaudeAccount (unofficial; see ClaudeUsage.swift),
+/// and the built-in list stays when that can't be read.
 @MainActor
 final class ClaudeModels: ObservableObject {
     static let shared = ClaudeModels()
@@ -111,7 +112,7 @@ final class ClaudeModels: ObservableObject {
     func load() async {
         configured = Self.readConfigured()
         guard !loaded else { return }
-        if let models = await Self.fetch(), !models.isEmpty {
+        if let models = await ClaudeAccount.shared.models() {
             all = models
             loaded = true
         }
@@ -129,24 +130,6 @@ final class ClaudeModels: ObservableObject {
         guard let data = try? Data(contentsOf: file),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
         return json["model"] as? String
-    }
-
-    nonisolated private static func fetch() async -> [AgentModel]? {
-        guard let token = await Task.detached(priority: .utility, operation: { ClaudeUsage.accessToken() }).value else { return nil }
-        var request = URLRequest(url: URL(string: "https://api.anthropic.com/v1/models?limit=100")!)
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
-        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-        request.timeoutInterval = 15
-        guard let (data, response) = try? await URLSession.shared.data(for: request),
-              (response as? HTTPURLResponse)?.statusCode == 200,
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let list = json["data"] as? [[String: Any]] else { return nil }
-        return list.compactMap { item in
-            guard let id = item["id"] as? String else { return nil }
-            let name = (item["display_name"] as? String ?? id).replacingOccurrences(of: "Claude ", with: "")
-            return AgentModel(id: id, name: name)
-        }
     }
 }
 

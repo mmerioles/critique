@@ -106,7 +106,7 @@ The Agent tab runs one main agent (Claude Code, Codex or Gemini CLI, with the mo
 
 Claude Code runs **headless** by default: no terminal, one `claude -p` session per project in that project's folder, which Critique talks to over JSON and picks up again (`--resume`) after a restart. Each session starts with the first critique for its project and gets the whole feedback as its message. **Show** opens a transcript of what it was told, said and did. Switch Headless off on the Agent tab for a real terminal session at the top of your projects folder; there, Critique learns the session's status from Claude Code hooks (passed with `--settings`, alongside your own) rather than by reading its screen.
 
-The top of the tab shows your Claude plan usage, the 5-hour window and the week, the same numbers as `/usage`. It reads Claude Code's saved sign-in from your keychain.
+The top of the tab shows your Claude plan usage, the 5-hour window and the week, the same numbers as `/usage`. It reads Claude Code's saved sign-in from your keychain and asks the same unofficial endpoint Claude Code does; when that can't be read, the meters simply stay hidden.
 
 ## Releasing
 

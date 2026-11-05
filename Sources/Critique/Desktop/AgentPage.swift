@@ -13,7 +13,7 @@ struct AgentPage: View {
 
     var body: some View {
         PageScaffold(title: "Agent", subtitle: "Picks up your critiques and makes the changes.") {
-            UsageMeters(state: usage.state, now: now)
+            UsageMeters(usage: usage.usage, now: now)
         } content: {
             card
             if !agents.running.isEmpty {
@@ -332,29 +332,22 @@ private struct ModelPicker: View {
     }
 }
 
-/// Your Claude plan usage: the 5-hour window and the week.
+/// Your Claude plan usage: the 5-hour window and the week. Nothing at all when it can't be read.
 private struct UsageMeters: View {
-    let state: ClaudeUsage.State
+    let usage: ClaudeAccount.Usage?
     let now: Date
 
     var body: some View {
-        switch state {
-        case .unknown:
-            EmptyView()
-        case .signedOut:
-            Text("Open Claude Code to see usage").font(.system(size: 11)).foregroundStyle(Theme.tertiary)
-        case .failed:
-            Text("Usage unavailable").font(.system(size: 11)).foregroundStyle(Theme.tertiary)
-        case .loaded(let fiveHour, let weekly):
+        if let usage {
             Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 6) {
-                if let fiveHour { row("5-hour", fiveHour) }
-                if let weekly { row("Weekly", weekly) }
+                if let fiveHour = usage.fiveHour { row("5-hour", fiveHour) }
+                if let weekly = usage.weekly { row("Weekly", weekly) }
             }
             .help("Claude plan usage, same as /usage in Claude Code")
         }
     }
 
-    private func row(_ title: String, _ window: ClaudeUsage.Window) -> some View {
+    private func row(_ title: String, _ window: ClaudeAccount.Window) -> some View {
         GridRow {
             Text(title).font(.system(size: 11)).foregroundStyle(Theme.secondary)
             ZStack(alignment: .leading) {
