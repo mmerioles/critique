@@ -65,6 +65,7 @@ final class CritiqueController {
         let screen = ScreenCapture.screenUnderMouse()
         bar.show(on: screen)
         play("Pop")
+        MirrorAnnotation.shared.desktopSession(active: true) // the phone mirror lets go of `
         sessionKeys = [
             HotKeys.shared.register(kVK_Escape, 0) { [weak self] in self?.cancel() },
             // Hold ` to draw with the cursor.
@@ -350,6 +351,7 @@ final class CritiqueController {
         for id in sessionKeys { HotKeys.shared.unregister(id) }
         sessionKeys = []
         session.isDrawing = false
+        MirrorAnnotation.shared.desktopSession(active: false)
     }
 
     func notice(_ text: String?, sent: String? = nil, seconds: Double) {

@@ -41,7 +41,7 @@ final class Mobile: ObservableObject {
     private var listener: LineProcess?
     private var listeningTo: String?
     private var pollTask: Task<Void, Never>?
-    private var recording: Recording?
+    private(set) var recording: Recording?
 
     // MARK: Watching for phones
 
@@ -126,6 +126,7 @@ final class Mobile: ObservableObject {
         }
         self.recording = recording
         phase = .recording(since: Date())
+        MirrorAnnotation.shared.begin() // hold ` over the phone mirror to draw
         ADB.setTile(device.serial, "recording")
         Task { _ = await ADB.shell(device.serial, "cmd statusbar collapse") }
         notice?("Recording \(device.model) — tap the Critique tile again to send")
@@ -134,6 +135,7 @@ final class Mobile: ObservableObject {
     func send() {
         guard case .recording = phase, let recording else { return }
         phase = .sending
+        MirrorAnnotation.shared.end()
         ADB.setTile(recording.device.serial, "sending")
         Task {
             _ = await ADB.shell(recording.device.serial, "cmd statusbar collapse")
@@ -158,6 +160,7 @@ final class Mobile: ObservableObject {
         recording.discard()
         self.recording = nil
         phase = .idle
+        MirrorAnnotation.shared.end()
         ADB.setTile(recording.device.serial, "idle")
     }
 
@@ -284,6 +287,8 @@ final class Recording {
     private var scrcpyOutput: [String] = []
     private let startedAt = Date()
     private var stoppedAt = Date()
+    /// Strokes drawn on the phone mirror while recording (MirrorAnnotation.swift).
+    var drawings: [MirrorAnnotation.Drawing] = []
 
     init(device: ADB.Device) { self.device = device }
 
@@ -375,7 +380,9 @@ final class Recording {
             }
         }
 
-        let (shots, interactions) = await gestures(clockStart: clockStart, asset: asset)
+        let (taps, interactions) = await gestures(clockStart: clockStart, asset: asset)
+        // Strokes drawn on the phone mirror, numbered with the taps in time order.
+        let shots = await withDrawings(taps, clockStart: clockStart, asset: asset, apps: apps)
         let notes = Self.notes(words: words, shots: shots)
         guard !notes.isEmpty || !shots.isEmpty else {
             discard()
