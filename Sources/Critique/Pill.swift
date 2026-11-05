@@ -109,6 +109,9 @@ struct PillView: View {
                 .foregroundStyle(.white.opacity(0.85))
                 .transition(.scale.combined(with: .opacity))
             }
+            if let hint = session.hint {
+                Text(hint).font(.system(size: 11, weight: .medium)).foregroundStyle(.red)
+            }
         }
         .padding(.horizontal, 14)
         .frame(height: 38)

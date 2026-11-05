@@ -8,6 +8,10 @@ struct StoragePage: View {
     @State private var age: Age = .month
     @State private var scope: Scope = .everything
     @State private var confirming = false
+    @State private var keep = Retention.current
+    @State private var limit = SessionLimit.current
+    @State private var confirmingDeleteAll = false
+    @State private var deleting = false
 
     enum Age: String, CaseIterable, Identifiable {
         case week = "Older than 1 week"
@@ -37,6 +41,7 @@ struct StoragePage: View {
             if let usage {
                 disk(usage)
                 breakdown(usage)
+                recordings(usage)
                 cleanup(usage)
             } else {
                 ProgressView().controlSize(.small)
@@ -101,10 +106,96 @@ struct StoragePage: View {
                 Divider().overlay(Theme.border)
                 kindRow("waveform", "Voice audio", usage.audio)
                 Divider().overlay(Theme.border)
-                kindRow("photo", "Screenshots and frames", usage.images)
+                kindRow("photo", "Screenshots and frames", usage.images + usage.frames)
                 Divider().overlay(Theme.border)
                 kindRow("doc.text", "Notes and transcripts", usage.notes)
             }
+        }
+    }
+
+    /// How long recordings stay, how long a critique may run, and a way to drop every recording now.
+    private func recordings(_ measured: StorageUsage) -> some View {
+        let recordings = measured.videos + measured.frames
+        return VStack(alignment: .leading, spacing: 12) {
+            section("Recordings")
+            RowList {
+                settingRow("clock.arrow.circlepath", "Keep screen recordings for",
+                           "Older critiques keep their notes, voice and screenshots.") {
+                    Picker("", selection: $keep) {
+                        ForEach(Retention.allCases) { Text($0.name).tag($0) }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                    .onChange(of: keep) { _, value in
+                        Retention.current = value
+                        Task { await Retention.sweep(); usage = await StorageUsage.measure() }
+                    }
+                }
+                Divider().overlay(Theme.border)
+                settingRow("timer", "Longest critique",
+                           "A critique sends itself at this length, or stops if nothing was said.") {
+                    Picker("", selection: $limit) {
+                        ForEach(SessionLimit.allCases) { Text($0.name).tag($0) }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                    .onChange(of: limit) { _, value in SessionLimit.current = value }
+                }
+                Divider().overlay(Theme.border)
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("Recordings take \(bytes(recordings))").font(.system(size: 14, weight: .medium))
+                        Text("· screenshots \(bytes(measured.images))").font(.system(size: 14)).foregroundStyle(Theme.secondary)
+                        Spacer()
+                        Button(deleting ? "Deleting…" : "Delete all recordings now") { confirmingDeleteAll = true }
+                            .disabled(recordings == 0 || deleting)
+                    }
+                    GeometryReader { geo in
+                        let total = max(Double(recordings + measured.images), 1)
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(Theme.selected)
+                            Capsule().fill(Theme.red).frame(width: Double(recordings) / total * geo.size.width)
+                        }
+                    }
+                    .frame(height: 6)
+                    HStack(spacing: 16) {
+                        legend(Theme.red, "Screen recordings and frames")
+                        legend(Theme.selected, "Screenshots")
+                    }
+                }
+                .padding(.horizontal, 18)
+                .padding(.vertical, 14)
+            }
+            .confirmationDialog("Delete the recordings from all \(measured.critiques.count) critiques?",
+                                isPresented: $confirmingDeleteAll) {
+                Button("Delete Recordings", role: .destructive) { deleteAll() }
+            } message: {
+                Text("Frees \(bytes(recordings)) right away — this skips the Trash. Notes, voice and screenshots stay.")
+            }
+        }
+    }
+
+    private func settingRow<Control: View>(_ icon: String, _ name: String, _ why: String,
+                                           @ViewBuilder control: () -> Control) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: icon).foregroundStyle(Theme.secondary).frame(width: 20)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name).font(.system(size: 14))
+                Text(why).font(.system(size: 12)).foregroundStyle(Theme.secondary)
+            }
+            Spacer()
+            control()
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
+    }
+
+    private func deleteAll() {
+        deleting = true
+        Task {
+            _ = await Retention.deleteAllRecordings()
+            usage = await StorageUsage.measure()
+            deleting = false
         }
     }
 
@@ -226,10 +317,12 @@ struct StorageUsage: Sendable {
     var videos: Int64 = 0
     var audio: Int64 = 0
     var images: Int64 = 0
+    /// Stills pulled from recordings (the frames/ folder); they go when the recording goes.
+    var frames: Int64 = 0
     var notes: Int64 = 0
     var diskFree: Int64 = 0
     var diskTotal: Int64 = 0
-    var total: Int64 { videos + audio + images + notes }
+    var total: Int64 { videos + audio + images + frames + notes }
 
     static func measure() async -> StorageUsage {
         await Task.detached(priority: .utility) { scan() }.value
@@ -256,7 +349,11 @@ struct StorageUsage: Sendable {
                     usage.audio += size
                     critique.media += size
                 case "png", "jpg", "jpeg":
-                    usage.images += size
+                    if file.deletingLastPathComponent().lastPathComponent == "frames" {
+                        usage.frames += size
+                    } else {
+                        usage.images += size
+                    }
                 default:
                     usage.notes += size
                 }

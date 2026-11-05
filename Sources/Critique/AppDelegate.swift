@@ -36,6 +36,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.menu = menu
 
         window.show()
+        // Clear out recordings left behind by crashes, and old ones past their keep-for limit.
+        Retention.start()
         // The agent runs from the start, so your first critique has somewhere to go.
         Agents.shared.ensureRunning()
         Task { await Transcriber.prepare() } // get the speech model ready before the first critique

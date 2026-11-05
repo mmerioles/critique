@@ -73,6 +73,8 @@ final class Session: ObservableObject {
     @Published var levels = [Float](repeating: 0, count: 28)
     /// True while you hold ` to draw.
     @Published var isDrawing = false
+    /// A short note shown in the pill while listening, e.g. "1 min left".
+    @Published var hint: String?
     private(set) var interactions: [Interaction] = []
     private(set) var startedAt = Date()
     /// Every finished word with when you said it — used to build the timeline.
@@ -179,6 +181,7 @@ final class Session: ObservableObject {
         spoken = []
         interactions = []
         isDrawing = false
+        hint = nil
         levels = [Float](repeating: 0, count: levels.count)
         startedAt = Date()
         micAvailable = true

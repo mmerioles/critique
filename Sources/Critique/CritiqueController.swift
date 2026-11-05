@@ -26,6 +26,8 @@ final class CritiqueController {
     private var sending = false
     private var lastLevelAt = Date.distantPast
     private let maxShots = 30
+    /// The warning and the stop for the session length limit (see SessionLimit.swift).
+    var capTimers: [DispatchWorkItem] = []
 
     init() {
         dictation.onSpeech = { [weak self] text, words in
@@ -73,6 +75,7 @@ final class CritiqueController {
             },
         ].compactMap { $0 }
         pointer.start()
+        armCap()
         if let app = NSWorkspace.shared.frontmostApplication { ElementLocator.wakeUp(app.processIdentifier) }
 
         // Check screen access up front (macOS's permission check can be stale,
@@ -89,7 +92,8 @@ final class CritiqueController {
         } }
         if Feature.screen.isOn { Task {
             do {
-                try await recorder.start(screen, excluding: [bar.windowNumber], microphone: Feature.voice.isOn)
+                try await recorder.start(screen, excluding: [bar.windowNumber], microphone: Feature.voice.isOn,
+                                         limit: SessionLimit.current.seconds)
             } catch {
                 log("screen recording unavailable: \(error.localizedDescription)")
             }
@@ -114,6 +118,7 @@ final class CritiqueController {
     func send() {
         guard session.isActive, !sending else { return }
         sending = true
+        disarmCap()
         pointer.stop()
         endKeys()
         bar.releaseFocus()
@@ -123,6 +128,7 @@ final class CritiqueController {
             guard let self else { return }
             Task {
                 let video = await self.recorder.stop()
+                Retention.sweepScratch(keeping: video)
                 self.session.finalizeText()
                 let live = self.session.committed
                 var audio: URL?
@@ -234,13 +240,17 @@ final class CritiqueController {
 
     func cancel() {
         guard session.isActive else { return }
+        disarmCap()
         dictation.stop()
         pointer.stop()
         endKeys()
         bar.releaseFocus()
         session.mode = .idle
         bar.hide()
-        Task { await recorder.discard() }
+        Task {
+            await recorder.discard()
+            Retention.sweepScratch(keeping: nil)
+        }
     }
 
     // MARK: Pointing
