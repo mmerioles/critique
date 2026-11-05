@@ -1,4 +1,8 @@
-# Tag a version (git tag v0.1.0 && git push --tags) to publish a downloadable build.
+# Tag a version (git tag v0.2.0 && git push --tags) to publish a downloadable build.
+#
+# With the signing secrets set (see "Releasing" in README.md) the DMG is signed with
+# a Developer ID certificate, notarized and stapled, so it opens without Gatekeeper
+# warnings. Without them (forks, local runs) it falls back to an ad-hoc signature.
 name: Release
 
 on:
@@ -14,8 +18,64 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+
+      - name: Import the Developer ID certificate
+        if: ${{ secrets.MACOS_CERTIFICATE_P12 != '' }}
+        env:
+          MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          CERT="$RUNNER_TEMP/certificate.p12"
+          echo "$MACOS_CERTIFICATE_P12" | base64 --decode > "$CERT"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$CERT" -P "$MACOS_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain-db
+          rm -f "$CERT"
+          SIGN_ID="$(security find-identity -v -p codesigning "$KEYCHAIN" \
+            | grep -o '"Developer ID Application: [^"]*"' | head -1 | tr -d '"')"
+          if [ -z "$SIGN_ID" ]; then
+            echo "No Developer ID Application certificate in MACOS_CERTIFICATE_P12" >&2
+            exit 1
+          fi
+          echo "Signing as $SIGN_ID"
+          echo "SIGN_ID=$SIGN_ID" >> "$GITHUB_ENV"
+          echo "KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
+
       - name: Build the DMG
-        run: make dmg SIGN_ID=-
+        # SIGN_ID is the Developer ID identity from the step above, or "-" (ad-hoc) without secrets.
+        run: make dmg SIGN_ID="${SIGN_ID:--}"
+
+      - name: Check the signature
+        if: ${{ env.SIGN_ID != '' }}
+        run: |
+          codesign --verify --strict --verbose=2 build/Critique.app
+          codesign --display --entitlements - build/Critique.app
+
+      - name: Notarize and staple the DMG
+        if: ${{ secrets.MACOS_CERTIFICATE_P12 != '' }}
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          set -euo pipefail
+          xcrun notarytool submit build/Critique.dmg \
+            --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" \
+            --wait --timeout 30m
+          xcrun stapler staple build/Critique.dmg
+          xcrun stapler validate build/Critique.dmg
+          spctl --assess --type open --context context:primary-signature --verbose=2 build/Critique.dmg
+
+      - name: Remove the signing keychain
+        if: ${{ always() && env.KEYCHAIN != '' }}
+        run: security delete-keychain "$KEYCHAIN"
+
       - uses: softprops/action-gh-release@v2
         with:
           files: build/Critique.dmg

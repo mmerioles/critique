@@ -15,10 +15,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Mobile.shared.deliver = { [weak critique] result in critique?.finishSending(result) }
         Mobile.shared.notice = { [weak critique] text in critique?.notice(text, seconds: 3.5) }
         Mobile.shared.startWatching()
+        Updater.shared.notice = { [weak critique] text in critique?.notice(text, seconds: 3.5) }
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: "Critique")
 
         let menu = NSMenu()
+        menu.addItem(Updater.shared.updateItem) // "Update to 0.x.y…", hidden until there is one
         menu.addItem(item("Open Critique", #selector(openWindow)))
         menu.addItem(item("Give Feedback  (double-tap `)", #selector(giveFeedback)))
         menu.addItem(.separator())
@@ -32,6 +34,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(item("Screen Recording Settings…", #selector(openPrivacy)))
         menu.addItem(item("Input Monitoring Settings…", #selector(openInputMonitoring)))
         menu.addItem(item("Accessibility Settings…", #selector(openAccessibility)))
+        menu.addItem(.separator())
+        menu.addItem(Updater.shared.checkItem)
         menu.addItem(item("Quit Critique", #selector(quit)))
         statusItem.menu = menu
 
@@ -39,6 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // The agent runs from the start, so your first critique has somewhere to go.
         Agents.shared.ensureRunning()
         Task { await Transcriber.prepare() } // get the speech model ready before the first critique
+        Updater.shared.start() // looks for a newer release after a short delay, then daily
         if !ScreenCapture.hasPermission { ScreenCapture.requestPermission() }
         // Lets Critique box the exact button/text you point at.
         if !ElementLocator.isTrusted { ElementLocator.requestTrust() }

@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.1.0-ff3b30" alt="Version 0.1.0">
+  <img src="https://img.shields.io/badge/version-0.2.0-ff3b30" alt="Version 0.2.0">
   <img src="https://img.shields.io/badge/platform-macOS%2015%2B-000000?logo=apple" alt="macOS 15+">
   <img src="https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white" alt="Swift 6">
   <img src="https://img.shields.io/badge/works%20with-Claude%20Code-D97757" alt="Works with Claude Code">
@@ -44,6 +44,14 @@ On first launch, allow Critique in **System Settings → Privacy & Security**:
 | Microphone + Speech Recognition | On-device dictation |
 
 Permissions on but not working? Run `tccutil reset All dev.critique.app` and allow again.
+
+### Updates
+
+Critique checks GitHub for a newer release shortly after launch and once a day. When there is one, the status menu gets an **Update to 0.x.y…** item and the sidebar shows a banner; both download the new DMG, which you drag over the old app. **Check for Updates…** in the menu checks on demand. To turn off the automatic check:
+
+```sh
+defaults write dev.critique.app updates.check -bool false
+```
 
 ## How it works
 
@@ -97,3 +105,27 @@ Click **Check for Updates** (or the refresh button on a repo) to fetch from GitH
 The Agent tab runs one main agent (Claude Code, Codex or Gemini CLI, with the model you pick) in your projects folder: `~/repos` unless you choose another. It runs in the background with no window. **Show** opens its terminal, and closing that window keeps it running. Every critique goes to it along with the project it's for, so it can work in any of your repos. It stops when you quit Critique.
 
 The top of the tab shows your Claude plan usage, the 5-hour window and the week, the same numbers as `/usage`. It reads Claude Code's saved sign-in from your keychain.
+
+## Releasing
+
+Push a tag to publish a build: `git tag v0.2.0 && git push --tags`. The Release workflow builds the DMG and attaches it to a GitHub release. Bump `CFBundleShortVersionString` in `Resources/Info.plist` (and the badge above) first; the in-app update check compares it with the tag.
+
+Without signing secrets the DMG is ad-hoc signed: it runs, but macOS warns on first open and resets the app's permissions on every build. Add these repository secrets and the workflow signs with your Developer ID, notarizes the DMG with Apple and staples the ticket, so it opens cleanly:
+
+| Secret | What it is |
+|---|---|
+| `MACOS_CERTIFICATE_P12` | Your **Developer ID Application** certificate and private key as a base64 `.p12` |
+| `MACOS_CERTIFICATE_PASSWORD` | The password you gave the `.p12` when exporting it |
+| `APPLE_ID` | The Apple ID of your developer account |
+| `APPLE_TEAM_ID` | Your 10-character team ID (Apple Developer → Membership) |
+| `APPLE_APP_PASSWORD` | An app-specific password for that Apple ID |
+
+One-time setup:
+
+1. In Xcode → Settings → Accounts → your team → **Manage Certificates…** → **+** → **Developer ID Application** (needs a paid Apple Developer account; only the account holder can make this kind of certificate).
+2. In Keychain Access, find the "Developer ID Application: …" certificate, expand it so the private key shows, select both, and **File → Export Items…** as a `.p12` with a password. Then `base64 -i cert.p12 | pbcopy` and paste it into `MACOS_CERTIFICATE_P12`.
+3. At [account.apple.com](https://account.apple.com) → Sign-In and Security → **App-Specific Passwords**, make one for notarization and put it in `APPLE_APP_PASSWORD`.
+
+Locally, `make app` signs with whatever Apple Development certificate you have (or ad-hoc if none), using the same hardened runtime and `Resources/Critique.entitlements`. To sign a local build with the Developer ID instead: `make dmg SIGN_ID="Developer ID Application: Your Name (TEAMID)"`.
+
+Next step: [Sparkle](https://sparkle-project.org) would update the app in place instead of handing you a DMG. It needs an appcast feed published with each release and an EdDSA key pair (`generate_keys`) whose public key goes in Info.plist and whose private key signs every DMG; set those up and the updater in `Sources/Critique/Updater.swift` can hand over to it.

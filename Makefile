@@ -5,6 +5,13 @@ SIGN_ID ?= $(shell security find-identity -v -p codesigning | grep -m1 -o '"Appl
 ifeq ($(strip $(SIGN_ID)),)
 SIGN_ID := -
 endif
+# A real identity gets the hardened runtime, a trusted timestamp and the
+# entitlements, which notarization requires. Ad-hoc ("-") can't have those.
+ifeq ($(SIGN_ID),-)
+SIGN_FLAGS :=
+else
+SIGN_FLAGS := --options runtime --timestamp --entitlements Resources/Critique.entitlements
+endif
 
 .PHONY: app dmg run install clean helper
 
@@ -22,7 +29,7 @@ app:
 	mkdir -p $(APP)/Contents/Resources
 	cp Resources/AppIcon.icns $(APP)/Contents/Resources/AppIcon.icns
 	cp Resources/critique-helper.apk $(APP)/Contents/Resources/critique-helper.apk
-	codesign --force --sign "$(SIGN_ID)" $(APP)
+	codesign --force --sign "$(SIGN_ID)" $(SIGN_FLAGS) $(APP)
 
 # Build the app and package it as a drag-to-Applications DMG
 dmg: app

@@ -139,6 +139,8 @@ struct Sidebar: View {
 
             Spacer()
 
+            UpdateBanner() // only shows when a newer release is out
+
             VStack(alignment: .center, spacing: 10) {
                 VStack(spacing: 3) {
                     Text("Start a critique").font(.system(size: 12, weight: .semibold))
