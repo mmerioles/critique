@@ -7,6 +7,7 @@ struct MobilePage: View {
     @ObservedObject private var mobile = Mobile.shared
     @ObservedObject private var projects = Projects.shared
     @ObservedObject private var mirror = PhoneMirror.shared
+    @ObservedObject private var annotation = MirrorAnnotation.shared
     @State private var now = Date()
     @State private var pairing = false
     @State private var busy: String?
@@ -107,6 +108,10 @@ struct MobilePage: View {
             }
             if mirror.isOn {
                 mirrorView
+                row("hand.tap", "Tap through", "Clicks and drags on the picture tap and swipe on your phone.") {
+                    Toggle("Tap through", isOn: $annotation.tapThrough)
+                        .toggleStyle(.switch).controlSize(.small).labelsHidden().tint(Theme.red)
+                }
             }
         }
         // a different phone was chosen: the stream belongs to the old one
@@ -119,9 +124,14 @@ struct MobilePage: View {
         switch mirror.state {
         case .off: "Stream your phone to this Mac while you test. Turns off when you switch it off or the phone disconnects."
         case .starting: "Connecting to your phone…"
-        case .live: mirror.placement == .window ? "Showing in its own window." : "Live from \(mobile.device?.model ?? "your phone")."
+        case .live: liveDetail
         case .failed(let message): message
         }
+    }
+
+    private var liveDetail: String {
+        if case .recording = mobile.phase { return "Hold ` over the phone to draw." }
+        return mirror.placement == .window ? "Showing in its own window." : "Live from \(mobile.device?.model ?? "your phone")."
     }
 
     @ViewBuilder private var mirrorView: some View {
