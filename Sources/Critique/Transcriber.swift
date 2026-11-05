@@ -21,6 +21,19 @@ enum Transcriber {
         "flexbox", "hover", "onboarding", "Wispr Flow", "Figma", "Tailwind", "React", "Next.js", "npm",
     ]
 
+    /// Everything the recognizers should listen for: the developer words above, names
+    /// seen during the session, and the project's own vocabulary — in that order, so
+    /// the most specific survive the cap. (Apple documents no count limit on
+    /// contextual strings, only ~100 characters per phrase; 200 keeps requests small.)
+    static func hints(_ session: [String]) -> [String] {
+        let project = ProjectVocabulary.current()
+        var seen = Set<String>()
+        let merged = (vocabulary + session + project)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty && $0.count <= 40 && seen.insert($0.lowercased()).inserted }
+        return Array(merged.prefix(200))
+    }
+
     /// Copies just the audio out of a screen recording, so agents can listen again.
     static func exportAudio(from video: URL, to destination: URL) async -> Bool {
         guard let export = AVAssetExportSession(asset: AVURLAsset(url: video), presetName: AVAssetExportPresetAppleM4A) else { return false }
@@ -36,7 +49,8 @@ enum Transcriber {
     /// Transcribes an audio file. `hints` are names seen during the session
     /// (apps, buttons, window titles) to help with unusual words.
     static func transcribe(_ audio: URL, hints: [String]) async -> (words: [Word], engine: String)? {
-        let hints = Array(Set(vocabulary + hints)).filter { !$0.isEmpty && $0.count <= 40 }.prefix(100).map { $0 }
+        let hints = Self.hints(hints)
+        log("transcription hints: \(hints.count) (\(ProjectVocabulary.current().count) from the project)")
         #if compiler(>=6.2)
         if #available(macOS 26, *), let words = await longForm(audio, hints: hints), !words.isEmpty {
             return (words, "Apple SpeechTranscriber")

@@ -109,7 +109,7 @@ final class Dictation {
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
         request.addsPunctuation = true
-        request.contextualStrings = Transcriber.vocabulary
+        request.contextualStrings = Transcriber.hints([]) // developer words + the project's own
         if recognizer.supportsOnDeviceRecognition { request.requiresOnDeviceRecognition = true }
         box.request = request
         task = recognizer.recognitionTask(with: request) { [weak self] result, error in

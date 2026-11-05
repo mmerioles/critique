@@ -441,6 +441,11 @@ final class Recording {
                         let a = Double(i) / 36 * 2 * .pi + .pi * 0.75
                         return CGPoint(x: p.x + r * cos(a), y: p.y + r * sin(a))
                     }
+                    // No accessibility tree from the phone: read what was under the finger.
+                    let read = await TextRecognizer.around(p, in: image, size: CGSize(width: w * 0.5, height: h * 0.07))
+                    let element = [shot.element, read.element].compactMap { $0 }
+                    shot.element = element.isEmpty ? nil : element.joined(separator: " ")
+                    shot.inside = read.inside
                 }
                 shot.time = g.began
                 shots.append(shot)
