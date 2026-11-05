@@ -15,6 +15,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Mobile.shared.deliver = { [weak critique] result in critique?.finishSending(result) }
         Mobile.shared.notice = { [weak critique] text in critique?.notice(text, seconds: 3.5) }
         Mobile.shared.startWatching()
+        // The browser extension connects here to add DOM details to drawings on web pages.
+        DOMCapture.shared.start()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: "Critique")
 

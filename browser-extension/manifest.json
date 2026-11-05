@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Critique",
+  "version": "0.1.0",
+  "description": "Tells Critique which elements you drew around on a web page: CSS selector, test id, and React/Vue/Svelte component.",
+  "permissions": ["scripting", "alarms"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js",
+    "scripts": ["inspect.js", "background.js"]
+  },
+  "action": {
+    "default_title": "Critique",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "minimum_chrome_version": "121"
+}

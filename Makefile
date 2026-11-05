@@ -22,6 +22,7 @@ app:
 	mkdir -p $(APP)/Contents/Resources
 	cp Resources/AppIcon.icns $(APP)/Contents/Resources/AppIcon.icns
 	cp Resources/critique-helper.apk $(APP)/Contents/Resources/critique-helper.apk
+	cp -R browser-extension $(APP)/Contents/Resources/browser-extension
 	codesign --force --sign "$(SIGN_ID)" $(APP)
 
 # Build the app and package it as a drag-to-Applications DMG

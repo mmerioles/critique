@@ -278,8 +278,13 @@ final class CritiqueController {
             let context = ScreenCapture.windowContext(at: Self.topLeft(NSPoint(x: drawn.midX, y: drawn.midY)))
             Task {
                 guard session.shots.count < maxShots else { return }
-                let inside = await ElementLocator.elements(in: Self.topLeft(drawn.insetBy(dx: -12, dy: -12)), maxArea: maxArea).map(\.label)
+                let area = Self.topLeft(drawn.insetBy(dx: -12, dy: -12))
+                let inside = await ElementLocator.elements(in: area, maxArea: maxArea).map(\.label)
+                // On a web page, the browser extension adds selectors and component names for the agent.
+                async let web = DOMCapture.shared.snapshot(in: area, hint: inside.first, app: context.app,
+                                                           scale: screen.backingScaleFactor)
                 guard let image = try? await ScreenCapture.capture(screen), session.isActive else { return }
+                let dom = await web
                 let scale = CGFloat(image.width) / screen.frame.width
                 func px(_ q: NSPoint) -> CGPoint {
                     CGPoint(x: (q.x - screen.frame.minX) * scale, y: (screen.frame.maxY - q.y) * scale)
@@ -288,8 +293,11 @@ final class CritiqueController {
                 let region = CGRect(x: (box.minX - screen.frame.minX) * scale, y: (screen.frame.maxY - box.maxY) * scale,
                                     width: box.width * scale, height: box.height * scale)
                 session.addShot({
-                    Shot(number: $0, kind: .drawing, image: image, region: region,
-                         app: context.app, window: context.title, stroke: stroke.map(px), inside: inside)
+                    var shot = Shot(number: $0, kind: .drawing, image: image, region: region,
+                                    app: context.app, window: context.title, stroke: stroke.map(px), inside: inside)
+                    shot.dom = dom?.elements ?? []
+                    shot.page = dom?.page
+                    return shot
                 }, at: since)
             }
         }

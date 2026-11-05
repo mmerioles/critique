@@ -49,6 +49,8 @@ enum FeedbackWriter {
             record.at = max(0, shot.time.timeIntervalSince(input.clockStart))
             record.said = said(around: shot, in: input)
             record.inside = shot.inside.isEmpty ? nil : shot.inside
+            record.dom = shot.dom.isEmpty ? nil : shot.dom
+            record.page = shot.page
             // The whole screen, with your stroke drawn on it.
             var image = shot.image
             if let stroke = shot.stroke, stroke.count > 1 {

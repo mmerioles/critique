@@ -12,6 +12,10 @@ struct ConnectPage: View {
     }
 
     var body: some View {
+        ScrollView { content }
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 28) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Connect your agent").font(.system(size: 26, weight: .medium))
@@ -50,6 +54,8 @@ struct ConnectPage: View {
             }
             .toggleStyle(.switch)
             .tint(Theme.red)
+
+            BrowserExtensionSection()
 
             Spacer()
         }

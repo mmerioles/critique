@@ -24,6 +24,10 @@ struct Shot {
     var stroke: [CGPoint]? = nil
     /// Buttons, links, fields… inside what you drew.
     var inside: [String] = []
+    /// On a web page: the DOM elements inside what you drew, from the browser extension.
+    var dom: [DOMElement] = []
+    /// On a web page: its URL and title.
+    var page: DOMPage? = nil
     /// When you pointed at it.
     var time = Date()
 }

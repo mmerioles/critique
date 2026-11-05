@@ -24,6 +24,10 @@ struct FeedbackRecord: Codable {
         var said: String?
         /// Interactive elements inside what they drew
         var inside: [String]?
+        /// On a web page: DOM elements inside what they drew (selector, test id, component), from the browser extension
+        var dom: [DOMElement]?
+        /// On a web page: its URL and title
+        var page: DOMPage?
     }
 
     /// One moment in the session, on the screen recording's clock.
@@ -148,11 +152,13 @@ struct FeedbackRecord: Codable {
         }
 
         md += "## Screenshots\n\n"
+        if let note = domNote { md += note }
         for shot in shots {
             var context = shot.app ?? "Unknown app"
             if let window = shot.window { context += " — “\(window)”" }
             md += "- **#\(shot.number) \(Self.label(shot.kind))**\(shot.element.map { " \($0)" } ?? "") · \(context)\n"
             if let inside = shot.inside, !inside.isEmpty { md += "  - Inside the drawing: \(inside.joined(separator: ", "))\n" }
+            md += shot.domMarkdown
             md += "  - Image: `\(dir.appendingPathComponent(shot.file).path)`\n"
             if let zoom = shot.zoomFile { md += "  - Zoomed in: `\(dir.appendingPathComponent(zoom).path)`\n" }
             if let r = shot.region, r.count == 4 { md += "  - Box: \(r[2])×\(r[3]) px at (\(r[0]), \(r[1]))\n" }
