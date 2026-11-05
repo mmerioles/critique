@@ -14,6 +14,10 @@ final class MainWindow: NSWindowController, NSWindowDelegate {
         window.minSize = NSSize(width: 860, height: 560)
         window.isMovableByWindowBackground = true
         window.backgroundColor = NSColor(Theme.sidebar)
+        // Critique's window is always light. Pinning the appearance here (not
+        // just SwiftUI's colorScheme) carries it into every sheet and AppKit
+        // control, so a Mac in dark mode can't put light-theme text on a dark sheet.
+        window.appearance = NSAppearance(named: .aqua)
         window.contentViewController = NSHostingController(rootView: RootView(store: store, handoff: handoff))
         window.setContentSize(NSSize(width: 1120, height: 760))
         window.center()
@@ -32,17 +36,30 @@ final class MainWindow: NSWindowController, NSWindowDelegate {
     }
 }
 
+/// Light-only palette (see MainWindow). Text greys meet WCAG AA on white, and
+/// go darker still when the Mac has Accessibility → Display → Increase contrast on.
 enum Theme {
     static let sidebar = Color(red: 0.965, green: 0.957, blue: 0.945)   // warm off-white
     static let panel = Color.white
-    static let border = Color(red: 0.91, green: 0.9, blue: 0.88)
+    static let border = adaptive(0.91, 0.9, 0.88, contrast: (0.62, 0.61, 0.59))
     static let selected = Color(red: 0.925, green: 0.914, blue: 0.894)
     static let hover = Color(red: 0.98, green: 0.976, blue: 0.968)
     static let ink = Color(red: 0.11, green: 0.11, blue: 0.12)
-    static let secondary = Color(red: 0.47, green: 0.46, blue: 0.44)
-    static let tertiary = Color(red: 0.64, green: 0.63, blue: 0.61)
+    /// Body help text: 5.4:1 on white.
+    static let secondary = adaptive(0.43, 0.42, 0.40, contrast: (0.28, 0.27, 0.26))
+    /// Quiet labels: 3.6:1 on white, for short hints next to darker text.
+    static let tertiary = adaptive(0.55, 0.54, 0.52, contrast: (0.36, 0.35, 0.34))
     static let red = Color(red: 1, green: 0.23, blue: 0.19)
+    /// Success ticks and labels: 5:1 on white (the old 0.2/0.6/0.35 was 3.6:1).
+    static let green = adaptive(0.13, 0.5, 0.27, contrast: (0.08, 0.38, 0.19))
     static let banner = Color(red: 0.1, green: 0.1, blue: 0.12)
+
+    private static func adaptive(_ r: Double, _ g: Double, _ b: Double, contrast: (Double, Double, Double)) -> Color {
+        Color(nsColor: NSColor(name: nil) { _ in
+            let c = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast ? contrast : (r, g, b)
+            return NSColor(srgbRed: c.0, green: c.1, blue: c.2, alpha: 1)
+        })
+    }
 }
 
 enum Page: String, CaseIterable, Identifiable {

@@ -172,7 +172,7 @@ private struct MasterStatus: View {
         switch agent.status {
         case .working: Theme.red
         case .needsYou: Color.orange
-        case .ready: Color(red: 0.2, green: 0.6, blue: 0.35)
+        case .ready: Theme.green
         case .starting: Theme.tertiary
         }
     }

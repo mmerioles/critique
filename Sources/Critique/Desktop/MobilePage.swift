@@ -164,7 +164,7 @@ struct MobilePage: View {
                     : "A Quick Settings tile that starts and sends a critique. It only tells this Mac when you tap it.") {
                 if mobile.helperInstalled[serial] == true {
                     Label("Installed", systemImage: "checkmark.circle.fill").font(.system(size: 12))
-                        .foregroundStyle(Color(red: 0.2, green: 0.6, blue: 0.35))
+                        .foregroundStyle(Theme.green)
                 } else {
                     Button(busy == "helper" ? "Installing…" : "Install tile") {
                         run("helper") {
@@ -181,7 +181,7 @@ struct MobilePage: View {
                     : "Critique uses scrcpy to record your phone's screen and mic.") {
                 if hasScrcpy {
                     Label("Ready", systemImage: "checkmark.circle.fill").font(.system(size: 12))
-                        .foregroundStyle(Color(red: 0.2, green: 0.6, blue: 0.35))
+                        .foregroundStyle(Theme.green)
                 } else {
                     Button(busy == "scrcpy" ? "Installing…" : "Install scrcpy") {
                         run("scrcpy") {
@@ -242,7 +242,7 @@ struct MobilePage: View {
 
     private var statusColor: Color {
         switch mobile.phase {
-        case .idle: Color(red: 0.2, green: 0.6, blue: 0.35)
+        case .idle: Theme.green
         case .recording: Theme.red
         case .sending: Color.orange
         }
@@ -299,7 +299,7 @@ struct MobilePage: View {
     private var installColor: Color {
         switch mobile.installer {
         case .failed: Theme.red
-        case .done: Color(red: 0.2, green: 0.6, blue: 0.35)
+        case .done: Theme.green
         default: Theme.secondary
         }
     }
@@ -408,6 +408,8 @@ private struct PairSheet: View {
         }
         .padding(24)
         .frame(width: 480)
+        .foregroundStyle(Theme.ink)
+        .presentationBackground(Theme.panel)
         .task {
             async let allowed = LocalNetwork.isAllowed()
             await ADB.takeOverServer()
