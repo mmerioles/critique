@@ -43,6 +43,8 @@ final class CritiqueController {
         }
         // Backup trigger that works even without Input Monitoring permission.
         HotKeys.shared.register(kVK_Space, controlKey | optionKey) { [weak self] in self?.toggle() }
+        // Learn the project's words (component names, button labels…) for dictation, now and whenever it changes.
+        ProjectVocabulary.watch()
     }
 
     func toggle() {
@@ -74,6 +76,7 @@ final class CritiqueController {
         ].compactMap { $0 }
         pointer.start()
         if let app = NSWorkspace.shared.frontmostApplication { ElementLocator.wakeUp(app.processIdentifier) }
+        ProjectVocabulary.prepare() // picks up files edited since last time; in the background
 
         // Check screen access up front (macOS's permission check can be stale,
         // so try a capture) — screenshots themselves are only taken when you draw.
@@ -270,6 +273,11 @@ final class CritiqueController {
             Task {
                 if let element = await ElementLocator.element(at: Self.topLeft(p), maxArea: maxArea), session.isActive {
                     session.log(.click, element.label, at: since)
+                } else if session.isActive {
+                    // Nothing named under the cursor: read what's written there instead.
+                    // (A small capture is cheap enough for clicks; hovers are too frequent.)
+                    let read = await TextRecognizer.textNear(Self.topLeft(p), on: screen)
+                    if let text = read.element, session.isActive { session.log(.click, text, at: since) }
                 }
             }
         case .drawing(let stroke):
@@ -278,7 +286,8 @@ final class CritiqueController {
             let context = ScreenCapture.windowContext(at: Self.topLeft(NSPoint(x: drawn.midX, y: drawn.midY)))
             Task {
                 guard session.shots.count < maxShots else { return }
-                let inside = await ElementLocator.elements(in: Self.topLeft(drawn.insetBy(dx: -12, dy: -12)), maxArea: maxArea).map(\.label)
+                let found = await ElementLocator.elements(in: Self.topLeft(drawn.insetBy(dx: -12, dy: -12)), maxArea: maxArea)
+                var inside = found.map(\.label)
                 guard let image = try? await ScreenCapture.capture(screen), session.isActive else { return }
                 let scale = CGFloat(image.width) / screen.frame.width
                 func px(_ q: NSPoint) -> CGPoint {
@@ -287,6 +296,11 @@ final class CritiqueController {
                 let box = drawn.insetBy(dx: -12, dy: -12).intersection(screen.frame)
                 let region = CGRect(x: (box.minX - screen.frame.minX) * scale, y: (screen.frame.maxY - box.maxY) * scale,
                                     width: box.width * scale, height: box.height * scale)
+                // Accessibility drew a blank (canvas, game, custom-drawn UI): read the words off the pixels.
+                if TextRecognizer.wanted(for: found) {
+                    inside += await TextRecognizer.entries(in: image, region: region.insetBy(dx: 6 * scale, dy: 6 * scale))
+                    guard session.isActive else { return }
+                }
                 session.addShot({
                     Shot(number: $0, kind: .drawing, image: image, region: region,
                          app: context.app, window: context.title, stroke: stroke.map(px), inside: inside)
