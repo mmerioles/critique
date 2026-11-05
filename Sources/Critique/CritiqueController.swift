@@ -203,10 +203,9 @@ final class CritiqueController {
             let line = "Implement my UX feedback from Critique: \(path) (\(summary)). Read it and look at the screenshots first."
             // The main agent Critique runs gets it directly, told which project it's for.
             // Starts it first if it isn't running (unless you turned that off).
-            if let master = Agents.shared.ensureRunning() {
-                var forMaster = line
-                if let project = record.project { forMaster += " It's for \(project.name), in \(project.path)." }
-                if Agents.shared.send(forMaster) {
+            if let master = Agents.shared.ensureRunning(for: record.project) {
+                // A terminal agent gets the line with the project named; a headless session gets the feedback itself.
+                if Agents.shared.send(line, for: record, in: dir) {
                     sending = false
                     let place = record.project?.name.split(separator: "/").last.map(String.init)
                     let to = "\(master.kind.name)\(place.map { " for \($0)" } ?? "")"

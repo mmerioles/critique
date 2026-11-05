@@ -16,8 +16,13 @@ struct AgentPage: View {
             UsageMeters(state: usage.state, now: now)
         } content: {
             card
-            if let master = agents.master {
-                MasterStatus(agent: master, now: now)
+            if !agents.running.isEmpty {
+                RowList {
+                    ForEach(Array(agents.running.enumerated()), id: \.element.id) { i, agent in
+                        if i > 0 { Divider().overlay(Theme.border) }
+                        AgentRow(agent: agent, now: now)
+                    }
+                }
             }
         }
         .onReceive(tick) { now = $0 }
@@ -36,7 +41,7 @@ struct AgentPage: View {
             HStack(spacing: 12) {
                 Image(systemName: "folder").foregroundStyle(Theme.secondary).frame(width: 20)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Works in").font(.system(size: 12)).foregroundStyle(Theme.secondary)
+                    Text(agents.isHeadless ? "Projects folder" : "Works in").font(.system(size: 12)).foregroundStyle(Theme.secondary)
                     Text(agents.root.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
                         .font(.system(size: 13, design: .monospaced))
                         .lineLimit(1).truncationMode(.middle)
@@ -48,6 +53,7 @@ struct AgentPage: View {
                 KindMenu(agent: agents.master)
                 if let master = agents.master {
                     Button("Show") { master.show() }
+                        .help(master.mode == .headless ? "Open its transcript" : "Open its terminal")
                     Button("Stop") { agents.stop() }
                         .help(agents.autoStart ? "Stops it for now. It starts again with your next critique." : "Stop the agent")
                 } else {
@@ -70,6 +76,22 @@ struct AgentPage: View {
                 Toggle("Start automatically", isOn: $agents.autoStart)
                     .toggleStyle(.switch).controlSize(.small).labelsHidden()
                     .tint(Theme.red)
+            }
+            if agents.defaultKind == .claude {
+                Divider().overlay(Theme.border)
+                HStack(spacing: 12) {
+                    Image(systemName: "rectangle.dashed").foregroundStyle(Theme.secondary).frame(width: 20)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Headless").font(.system(size: 13, weight: .medium))
+                        Text("Runs Claude Code with no terminal: one session per project, in that project's folder, picked up again after a restart. Show opens its transcript. Off, it's one real Claude Code session in your projects folder.")
+                            .font(.system(size: 12)).foregroundStyle(Theme.secondary)
+                    }
+                    Spacer()
+                    Toggle("Headless", isOn: Binding(get: { agents.mode == .headless }, set: { agents.mode = $0 ? .headless : .terminal }))
+                        .toggleStyle(.switch).controlSize(.small).labelsHidden()
+                        .tint(Theme.red)
+                        .help(agents.running.isEmpty ? "" : "Switching restarts the agent")
+                }
             }
         }
         .padding(18)
@@ -134,28 +156,33 @@ private struct RepoMenu: View {
     }
 }
 
-/// What the running agent is doing right now.
-private struct MasterStatus: View {
+/// What a running agent is doing right now. Headless sessions also say which
+/// project they're in, and each has its own Show.
+private struct AgentRow: View {
     @ObservedObject var agent: Agent
     let now: Date
 
     var body: some View {
-        RowList {
-            HStack(spacing: 14) {
-                Circle().fill(color).frame(width: 8, height: 8).frame(width: 20)
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 8) {
-                        Text(agent.kind.name).font(.system(size: 14, weight: .medium))
-                        Text(agent.status.label).font(.system(size: 12)).foregroundStyle(color)
+        HStack(spacing: 14) {
+            Circle().fill(color).frame(width: 8, height: 8).frame(width: 20)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 8) {
+                    Text(agent.kind.name).font(.system(size: 14, weight: .medium))
+                    if agent.mode == .headless {
+                        Text(agent.shortName).font(.system(size: 12)).foregroundStyle(Theme.secondary)
                     }
-                    Text(detail)
-                        .font(.system(size: 12)).foregroundStyle(Theme.secondary).lineLimit(1)
+                    Text(agent.status.label).font(.system(size: 12)).foregroundStyle(color)
                 }
-                Spacer()
-                Text(uptime).font(.system(size: 12).monospacedDigit()).foregroundStyle(Theme.tertiary)
+                Text(detail)
+                    .font(.system(size: 12)).foregroundStyle(Theme.secondary).lineLimit(1)
             }
-            .padding(.horizontal, 18).padding(.vertical, 12)
+            Spacer()
+            Text(uptime).font(.system(size: 12).monospacedDigit()).foregroundStyle(Theme.tertiary)
+            if agent.mode == .headless {
+                Button("Show") { agent.show() }.controlSize(.small).help("Open its transcript")
+            }
         }
+        .padding(.horizontal, 18).padding(.vertical, 12)
     }
 
     private var detail: String {
