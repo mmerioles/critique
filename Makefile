@@ -6,7 +6,7 @@ ifeq ($(strip $(SIGN_ID)),)
 SIGN_ID := -
 endif
 
-.PHONY: app dmg run install clean helper
+.PHONY: app dmg run install clean helper test
 
 # Rebuild the phone helper (Quick Settings tile) into Resources/critique-helper.apk
 helper:
@@ -40,3 +40,7 @@ install: app
 
 clean:
 	rm -rf .build build
+
+# Run the unit tests
+test:
+	swift test

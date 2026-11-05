@@ -182,7 +182,11 @@ struct FeedbackRecord: Codable {
 }
 
 enum Inbox {
+    /// Tests point this at a temporary folder instead of CRITIQUE_HOME.
+    nonisolated(unsafe) static var overrideRoot: URL?
+
     static var root: URL {
+        if let overrideRoot { return overrideRoot }
         if let custom = ProcessInfo.processInfo.environment["CRITIQUE_HOME"] {
             return URL(fileURLWithPath: custom).appendingPathComponent("inbox")
         }

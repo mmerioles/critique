@@ -1,4 +1,4 @@
-# Makes sure the Mac app still builds.
+# Makes sure the Mac app still builds and its tests pass.
 name: Build
 
 on:
@@ -15,3 +15,5 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build the app
         run: make app SIGN_ID=-
+      - name: Run the tests
+        run: swift test

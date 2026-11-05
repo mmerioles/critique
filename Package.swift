@@ -11,7 +11,10 @@ let package = Package(
     targets: [
         .executableTarget(name: "Critique",
                           dependencies: [.product(name: "SwiftTerm", package: "SwiftTerm")],
-                          path: "Sources/Critique")
+                          path: "Sources/Critique"),
+        .testTarget(name: "CritiqueTests",
+                    dependencies: ["Critique"],
+                    path: "Tests/CritiqueTests")
     ],
     swiftLanguageModes: [.v5]
 )
