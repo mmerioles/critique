@@ -102,7 +102,7 @@ enum FeedbackWriter {
 
     /// Lines up what you said, hovered, clicked, and captured on the recording's clock,
     /// and pulls frames from the recording for moments that have no screenshot.
-    private static func timeline(_ input: Input, shots: [FeedbackRecord.ShotRecord], video: URL?, dir: URL) -> [FeedbackRecord.Moment] {
+    static func timeline(_ input: Input, shots: [FeedbackRecord.ShotRecord], video: URL?, dir: URL) -> [FeedbackRecord.Moment] {
         func at(_ date: Date) -> Double { max(0, date.timeIntervalSince(input.clockStart)) }
         var moments: [FeedbackRecord.Moment] = []
 
@@ -192,7 +192,7 @@ enum FeedbackWriter {
     }
 
     /// The words you said while pointing at this shot (until the next one).
-    private static func said(around shot: Shot, in input: Input) -> String? {
+    static func said(around shot: Shot, in input: Input) -> String? {
         guard shot.kind != .screen || shot.number > 1 else { return nil }
         let next = input.shots.map(\.time).filter { $0 > shot.time }.min() ?? .distantFuture
         let words = input.words.filter { $0.time >= shot.time.addingTimeInterval(-0.25) && $0.time < next }.prefix(16)

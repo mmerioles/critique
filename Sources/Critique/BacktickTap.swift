@@ -16,13 +16,9 @@ final class BacktickTap {
     private var tap: CFMachPort?
     private var retryTimer: Timer?
 
-    private var downAt: TimeInterval?         // ` held since
-    private var lastTapAt: TimeInterval = 0   // when the last quick tap was released
+    private var detector = BacktickDetector()
     private var pending: DispatchWorkItem?    // double-tap waiting to see if a third ` follows
 
-    private let maxHold: TimeInterval = 0.25  // longer than this is a hold (drawing), not a tap
-    private let maxGap: TimeInterval = 0.4
-    private let fenceWait: TimeInterval = 0.25
     private static let modifiers: CGEventFlags = [.maskCommand, .maskControl, .maskAlternate, .maskShift]
 
     var isActive: Bool { tap != nil }
@@ -72,38 +68,34 @@ final class BacktickTap {
         case .tapDisabledByTimeout, .tapDisabledByUserInput:
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
         case .keyDown where isBacktick && !modified:
-            if repeated { return }
-            if pending != nil {
-                // A third ` right away: it's a code fence, not a trigger.
-                pending?.cancel()
-                pending = nil
-                lastTapAt = 0
-            }
-            downAt = now
+            act(on: detector.keyDown(at: now, repeated: repeated))
         case .keyUp where isBacktick:
-            guard let down = downAt else { return }
-            downAt = nil
-            guard now - down < maxHold else { lastTapAt = 0; return } // held to draw
-            guard now - lastTapAt < maxGap + maxHold else { lastTapAt = now; return }
-            lastTapAt = 0
-            if inSession() {
-                onDoubleTap() // ` is captured during a session, so nothing was typed
-            } else {
-                let work = DispatchWorkItem { [weak self] in
-                    guard let self else { return }
-                    self.pending = nil
-                    Self.deleteTypedBackticks()
-                    self.onDoubleTap()
-                }
-                pending = work
-                DispatchQueue.main.asyncAfter(deadline: .now() + fenceWait, execute: work)
-            }
+            act(on: detector.keyUp(at: now, inSession: inSession()))
         case .keyUp:
             break
         default:
             // Any other key or a click breaks the sequence.
-            downAt = nil
-            lastTapAt = 0
+            act(on: detector.reset())
+        }
+    }
+
+    private func act(on action: BacktickDetector.Action) {
+        switch action {
+        case .none, .hold:
+            break
+        case .trigger:
+            onDoubleTap() // ` is captured during a session, so nothing was typed
+        case .armFence:
+            let work = DispatchWorkItem { [weak self] in
+                guard let self else { return }
+                self.pending = nil
+                guard self.detector.fenceElapsed() == .trigger else { return }
+                Self.deleteTypedBackticks()
+                self.onDoubleTap()
+            }
+            pending = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + detector.fenceWait, execute: work)
+        case .cancelFence:
             pending?.cancel()
             pending = nil
         }
@@ -130,5 +122,71 @@ final class BacktickTap {
         AXUIElementCopyAttributeValue(focused as! AXUIElement, kAXRoleAttribute as CFString, &role)
         let name = role as? String ?? ""
         return ["AXTextField", "AXTextArea", "AXComboBox", "AXSearchField"].contains(name)
+    }
+}
+
+/// The timing behind the ` double-tap, kept apart from the event tap so it can be tested.
+/// Feed it key downs and ups (in seconds, any clock) and act on what comes back.
+struct BacktickDetector {
+    enum Action: Equatable {
+        case none
+        /// ` was held longer than a tap: you're drawing, not triggering.
+        case hold
+        /// Two quick taps during a session: trigger right away.
+        case trigger
+        /// Two quick taps outside a session typed ``: wait `fenceWait` for a third `
+        /// (a code fence), then call `fenceElapsed()` to see if it still counts.
+        case armFence
+        /// A third ` (or another key) arrived while waiting: it's a code fence, not a trigger.
+        case cancelFence
+    }
+
+    var maxHold: TimeInterval = 0.25  // longer than this is a hold (drawing), not a tap
+    var maxGap: TimeInterval = 0.4
+    var fenceWait: TimeInterval = 0.25
+
+    private static let never: TimeInterval = -.infinity
+    private var downAt: TimeInterval?         // ` held since
+    private var lastTapAt = never             // when the last quick tap was released
+    private var fenceArmed = false            // double-tap waiting to see if a third ` follows
+
+    mutating func keyDown(at now: TimeInterval, repeated: Bool = false) -> Action {
+        if repeated { return .none }
+        var action = Action.none
+        if fenceArmed {
+            // A third ` right away: it's a code fence, not a trigger.
+            fenceArmed = false
+            lastTapAt = Self.never
+            action = .cancelFence
+        }
+        downAt = now
+        return action
+    }
+
+    mutating func keyUp(at now: TimeInterval, inSession: Bool) -> Action {
+        guard let down = downAt else { return .none }
+        downAt = nil
+        guard now - down < maxHold else { lastTapAt = Self.never; return .hold } // held to draw
+        guard now - lastTapAt < maxGap + maxHold else { lastTapAt = now; return .none }
+        lastTapAt = Self.never
+        if inSession { return .trigger }
+        fenceArmed = true
+        return .armFence
+    }
+
+    /// `fenceWait` has passed since `.armFence` with no third `.
+    mutating func fenceElapsed() -> Action {
+        guard fenceArmed else { return .none }
+        fenceArmed = false
+        return .trigger
+    }
+
+    /// Any other key or a click breaks the sequence.
+    mutating func reset() -> Action {
+        downAt = nil
+        lastTapAt = Self.never
+        let wasArmed = fenceArmed
+        fenceArmed = false
+        return wasArmed ? .cancelFence : .none
     }
 }

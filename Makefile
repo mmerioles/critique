@@ -13,7 +13,7 @@ else
 SIGN_FLAGS := --options runtime --timestamp --entitlements Resources/Critique.entitlements
 endif
 
-.PHONY: app dmg run install clean helper
+.PHONY: app dmg run install clean helper test
 
 # Rebuild the phone helper (Quick Settings tile) into Resources/critique-helper.apk
 helper:
@@ -47,3 +47,7 @@ install: app
 
 clean:
 	rm -rf .build build
+
+# Run the unit tests
+test:
+	swift test
