@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Hardened runtime entitlements for Developer ID builds (make app SIGN_ID="Developer ID Application: …").
+         Only the microphone needs one: dictation records your voice. Screen Recording, Input Monitoring,
+         Accessibility and Speech Recognition are plain TCC permissions and need no entitlement, and the
+         app links nothing outside the bundle, so library validation stays on. -->
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+</dict>
+</plist>
