@@ -1,5 +1,6 @@
 import AVFoundation
 @preconcurrency import Speech
+import Synchronization
 
 /// Live speech-to-text from the microphone, with a time for every word so
 /// screenshots can be matched to what you were saying when you took them.
@@ -187,14 +188,13 @@ final class Dictation {
         request.addsPunctuation = true
         request.shouldReportPartialResults = false
         return await withCheckedContinuation { cont in
-            let lock = NSLock()
-            var words: [(text: String, at: TimeInterval)] = []
-            var finished = false
-            func finish() {
-                let done: [(text: String, at: TimeInterval)]? = lock.withLock {
-                    if finished { return nil }
-                    finished = true
-                    return words
+            // What's been heard so far, and whether the continuation was already resumed.
+            let heard = Mutex<(words: [(text: String, at: TimeInterval)], finished: Bool)>(([], false))
+            @Sendable func finish() {
+                let done: [(text: String, at: TimeInterval)]? = heard.withLock {
+                    if $0.finished { return nil }
+                    $0.finished = true
+                    return $0.words
                 }
                 if let done { cont.resume(returning: done) }
             }
@@ -207,7 +207,7 @@ final class Dictation {
                         guard seg.substringRange.location + seg.substringRange.length <= ns.length else { return nil }
                         return (ns.substring(with: seg.substringRange), seg.timestamp)
                     }
-                    lock.withLock { words += sentence }
+                    heard.withLock { $0.words += sentence }
                 }
                 if error != nil || result?.isFinal == true { finish() }
             }
@@ -228,7 +228,7 @@ final class Dictation {
     }
 }
 
-/// Lets the audio thread feed whichever request is current.
+/// Lets the audio thread feed whichever request is current. Unchecked: the one field is behind a lock.
 private final class RequestBox: @unchecked Sendable {
     private let lock = NSLock()
     private var _request: SFSpeechAudioBufferRecognitionRequest?

@@ -3,6 +3,8 @@ import Foundation
 
 /// System-wide hotkeys via Carbon. They need no Accessibility permission, and
 /// while registered the key goes to Critique instead of the app underneath.
+/// Main thread only: Carbon delivers the events on the main run loop.
+@MainActor
 final class HotKeys {
     static let shared = HotKeys()
 
@@ -51,7 +53,7 @@ final class HotKeys {
                               MemoryLayout<EventHotKeyID>.size, nil, &hotKeyID)
             let id = hotKeyID.id
             let released = GetEventKind(event) == UInt32(kEventHotKeyReleased)
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 guard let handlers = HotKeys.shared.handlers[id] else { return }
                 released ? handlers.release?() : handlers.press()
             }

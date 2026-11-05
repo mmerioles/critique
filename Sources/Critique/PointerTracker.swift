@@ -42,10 +42,10 @@ final class PointerTracker {
         isDrawing = false
         markup.show(cursor: anchor)
         timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.tick() }
+            MainActor.assumeIsolated { self?.tick() } // scheduled here, so it fires on the main run loop
         }
         clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] _ in
-            MainActor.assumeIsolated { self?.clicked() }
+            MainActor.assumeIsolated { self?.clicked() } // AppKit calls event monitors on the main thread
         }
     }
 

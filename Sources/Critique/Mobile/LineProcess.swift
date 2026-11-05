@@ -2,13 +2,14 @@ import Foundation
 
 /// A long-running command whose output arrives line by line on the main thread
 /// (adb logcat, getevent, scrcpy).
+/// Unchecked: `buffer` is only touched by the pipe's readability handler, one call at a time.
 final class LineProcess: @unchecked Sendable {
     private let process = Process()
     private var buffer = Data()
-    private let onLine: @MainActor (String) -> Void
-    var onExit: (@MainActor (Int32) -> Void)?
+    private let onLine: @MainActor @Sendable (String) -> Void
+    var onExit: (@MainActor @Sendable (Int32) -> Void)?
 
-    init(_ executable: String, _ args: [String], onLine: @escaping @MainActor (String) -> Void) {
+    init(_ executable: String, _ args: [String], onLine: @escaping @MainActor @Sendable (String) -> Void) {
         self.onLine = onLine
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = args
@@ -24,7 +25,7 @@ final class LineProcess: @unchecked Sendable {
         }
         process.terminationHandler = { [weak self] p in
             let status = p.terminationStatus
-            DispatchQueue.main.async { MainActor.assumeIsolated { self?.onExit?(status) } }
+            Task { @MainActor [weak self] in self?.onExit?(status) }
         }
     }
 
@@ -39,7 +40,7 @@ final class LineProcess: @unchecked Sendable {
         }
         guard !lines.isEmpty else { return }
         let onLine = onLine
-        DispatchQueue.main.async { MainActor.assumeIsolated { lines.forEach(onLine) } }
+        Task { @MainActor [lines] in lines.forEach(onLine) }
     }
 
     func start() throws { try process.run() }

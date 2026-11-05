@@ -33,7 +33,7 @@ final class AgentHandoff {
         ) { [weak self] note in
             guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
                   Self.isAgentApp(app) else { return }
-            MainActor.assumeIsolated { self?.lastAgentApp = app }
+            MainActor.assumeIsolated { self?.lastAgentApp = app } // delivered on the main queue
         }
     }
 

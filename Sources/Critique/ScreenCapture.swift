@@ -1,6 +1,8 @@
 import AppKit
 import ScreenCaptureKit
 
+/// Screenshots and what's on screen. Main actor: it reads NSScreen and the window list.
+@MainActor
 enum ScreenCapture {
     static var hasPermission: Bool { CGPreflightScreenCaptureAccess() }
     static func requestPermission() { CGRequestScreenCaptureAccess() }
@@ -12,7 +14,7 @@ enum ScreenCapture {
 
     /// Critique windows that *should* appear in screenshots (the main window), so
     /// you can critique Critique itself. The pill and red overlays never do.
-    nonisolated(unsafe) static var keepWindows: Set<CGWindowID> = []
+    static var keepWindows: Set<CGWindowID> = []
 
     /// Full-resolution screenshot of one display, without Critique's pill and overlays.
     static func capture(_ screen: NSScreen) async throws -> CGImage {

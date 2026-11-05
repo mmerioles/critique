@@ -7,7 +7,8 @@ import ScreenCaptureKit
 /// Every call can overlap with every other (start while a stop is in flight, a
 /// delegate callback mid-stop), so all state lives under one lock and a start
 /// that finishes after the session already ended stops its own stream.
-final class ScreenRecorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegate, SCStreamOutput {
+/// Unchecked: every mutable field is read and written under `lock`.
+final class ScreenRecorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegate, SCStreamOutput, @unchecked Sendable {
     /// Where in-progress recordings go. Anything here that isn't being written right now is an orphan.
     static var scratch: URL { Inbox.root.deletingLastPathComponent().appendingPathComponent("recording") }
     /// The recorder stops itself this long after the session limit, in case the controller never does.
@@ -29,22 +30,24 @@ final class ScreenRecorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegat
     var url: URL? { lock.withLock { fileURL } }
     var startedAt: Date? { lock.withLock { started } }
 
-    /// `excluding` are window numbers to leave out of the video (Critique's bar).
-    /// `limit` is the longest a session may run; the recorder stops itself `grace` after it.
-    func start(_ screen: NSScreen, excluding windowNumbers: [Int], microphone: Bool, limit: TimeInterval) async throws {
+    /// Records `display`, whose frame is `size` points. `excluding` are window numbers to leave
+    /// out of the video (Critique's bar). `limit` is the longest a session may run; the recorder
+    /// stops itself `grace` after it.
+    func start(display displayID: CGDirectDisplayID, size: CGSize, excluding windowNumbers: [Int],
+               microphone: Bool, limit: TimeInterval) async throws {
         // Never leave an earlier recording running in the background.
         await discard()
         let generation = lock.withLock { self.generation += 1; return self.generation }
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-        guard let display = content.displays.first(where: { $0.displayID == screen.displayID }) else { return }
+        guard let display = content.displays.first(where: { $0.displayID == displayID }) else { return }
         let hidden = content.windows.filter { windowNumbers.contains(Int($0.windowID)) }
         let filter = SCContentFilter(display: display, excludingWindows: hidden)
 
         // 1x points and 15 fps: text stays readable, and a minute is a few times smaller
         // than at Retina scale and 30 fps. SCRecordingOutput has no bitrate setting.
         let config = SCStreamConfiguration()
-        config.width = Int(screen.frame.width)
-        config.height = Int(screen.frame.height)
+        config.width = Int(size.width)
+        config.height = Int(size.height)
         config.minimumFrameInterval = CMTime(value: 1, timescale: 15)
         config.showsCursor = true
         config.captureMicrophone = microphone
@@ -140,6 +143,7 @@ final class ScreenRecorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegat
 
 /// One wait, resumed exactly once no matter how many callbacks (or the safety net) fire,
 /// and in any order — fire before wait just makes the wait return at once.
+/// Unchecked: both fields live under `lock`.
 private final class Once: @unchecked Sendable {
     private let lock = NSLock()
     private var continuation: CheckedContinuation<Void, Never>?

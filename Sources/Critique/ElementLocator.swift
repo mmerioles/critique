@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import Synchronization
 
 /// Finds the UI element under the cursor (a button, link, image, piece of text…)
 /// using macOS Accessibility — the same tech screen readers use. This is what lets
@@ -24,7 +25,8 @@ enum ElementLocator {
     static var isTrusted: Bool { AXIsProcessTrusted() && Feature.accessibility.isOn }
 
     static func requestTrust() {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        // kAXTrustedCheckOptionPrompt, spelled out: the C global isn't concurrency-safe to read.
+        let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(options)
     }
 
@@ -67,8 +69,9 @@ enum ElementLocator {
     // MARK: - Private (runs on `queue`)
 
     private static let queue = DispatchQueue(label: "critique.accessibility")
-    private static var awakened = Set<pid_t>()
-    private static let systemWide: AXUIElement = {
+    private static let awakened = Mutex(Set<pid_t>())
+    /// Unsafe: an immutable accessibility handle, only ever used on `queue`.
+    nonisolated(unsafe) private static let systemWide: AXUIElement = {
         let element = AXUIElementCreateSystemWide()
         AXUIElementSetMessagingTimeout(element, 0.3)
         return element
@@ -88,8 +91,7 @@ enum ElementLocator {
                                                     "AXPopUpButton", "AXMenuButton", "AXCell", "AXTab", "AXDisclosureTriangle"]
 
     private static func enableWebAccessibility(_ pid: pid_t) {
-        guard !awakened.contains(pid) else { return }
-        awakened.insert(pid)
+        guard awakened.withLock({ $0.insert(pid).inserted }) else { return }
         AXUIElementSetAttributeValue(AXUIElementCreateApplication(pid), "AXManualAccessibility" as CFString, kCFBooleanTrue)
     }
 

@@ -82,7 +82,7 @@ enum TextRecognizer {
 
     /// Reads what's written around the cursor, from a capture of just that bit of
     /// the screen. `point` is global, top-left origin; `size` is in points.
-    static func textNear(_ point: CGPoint, on screen: NSScreen, size: CGSize = CGSize(width: 280, height: 90)) async -> (element: String?, inside: [String]) {
+    @MainActor static func textNear(_ point: CGPoint, on screen: NSScreen, size: CGSize = CGSize(width: 280, height: 90)) async -> (element: String?, inside: [String]) {
         guard Feature.screen.isOn else { return (nil, []) }
         let scale = screen.backingScaleFactor
         let primaryHeight = NSScreen.screens[0].frame.height

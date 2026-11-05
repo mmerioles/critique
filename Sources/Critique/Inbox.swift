@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /// Feedback lives on disk so any agent can read it:
 ///   ~/.critique/inbox/<id>/feedback.md      ← human/agent-readable summary
@@ -189,7 +190,11 @@ struct FeedbackRecord: Codable {
 
 enum Inbox {
     /// Tests point this at a temporary folder instead of CRITIQUE_HOME.
-    nonisolated(unsafe) static var overrideRoot: URL?
+    static var overrideRoot: URL? {
+        get { override.withLock { $0 } }
+        set { override.withLock { $0 = newValue } }
+    }
+    private static let override = Mutex<URL?>(nil)
 
     static var root: URL {
         if let overrideRoot { return overrideRoot }

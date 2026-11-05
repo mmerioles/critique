@@ -58,6 +58,7 @@ final class MirrorAnnotation: ObservableObject {
         mirror.$state.receive(on: DispatchQueue.main).sink { [weak self] _ in self?.mirrorChanged() }.store(in: &watchers)
         clickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .leftMouseDragged, .leftMouseUp]) { [weak self] event in
             let type = event.type, window = event.window, at = event.locationInWindow
+            // AppKit calls event monitors on the main thread.
             let taken = MainActor.assumeIsolated { self?.forward(type, in: window, at: at) ?? false }
             return taken ? nil : event
         }
@@ -139,7 +140,7 @@ final class MirrorAnnotation: ObservableObject {
         strokeLayer = layer
 
         timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.tick() }
+            MainActor.assumeIsolated { self?.tick() } // scheduled here, so it fires on the main run loop
         }
     }
 

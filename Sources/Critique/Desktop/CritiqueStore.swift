@@ -51,7 +51,7 @@ final class CritiqueStore: ObservableObject {
         reload()
         watch()
         NotificationCenter.default.addObserver(forName: Self.didSave, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.reload() }
+            MainActor.assumeIsolated { self?.reload() } // delivered on the main queue
         }
     }
 
@@ -180,7 +180,7 @@ final class CritiqueStore: ObservableObject {
         guard fd >= 0 else { return }
         let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: [.write, .delete, .rename], queue: .main)
         source.setEventHandler { [weak self] in
-            MainActor.assumeIsolated {
+            MainActor.assumeIsolated { // the source runs on the main queue
                 guard let self else { return }
                 // Files are still being written right after the folder appears.
                 self.pending?.cancel()
@@ -196,6 +196,7 @@ final class CritiqueStore: ObservableObject {
 }
 
 /// Small, cached thumbnails so the list stays fast with full-resolution screenshots.
+@MainActor
 enum Thumbnails {
     private static let cache = NSCache<NSURL, NSImage>()
 

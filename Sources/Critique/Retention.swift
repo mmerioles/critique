@@ -25,7 +25,7 @@ enum Retention: Int, CaseIterable, Identifiable {
     }
     private static let key = "retention.recordingDays"
 
-    private static var daily: Timer?
+    @MainActor private static var daily: Timer?
 
     /// On launch: clear the scratch folder and apply the keep-for limit, then again once a day.
     @MainActor

@@ -400,7 +400,7 @@ final class Agents: ObservableObject {
     private func startPolling() {
         guard timer == nil else { return }
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated {
+            MainActor.assumeIsolated { // scheduled here, so it fires on the main run loop
                 guard let self else { return }
                 let running = self.running
                 running.forEach { $0.refreshStatus() }
@@ -879,7 +879,7 @@ final class Agent: NSObject, ObservableObject, Identifiable, LocalProcessTermina
         // works. Keep that as status, and just the words as the task.
         let glyph = title.prefix { !$0.isLetter && !$0.isNumber }.trimmingCharacters(in: .whitespaces)
         let words = title.drop { !$0.isLetter && !$0.isNumber }.trimmingCharacters(in: .whitespaces)
-        MainActor.assumeIsolated {
+        MainActor.assumeIsolated { // SwiftTerm calls its delegate on the main queue
             if kind == .claude { titleBusy = glyph.isEmpty ? nil : glyph != "✳" }
             task = words.isEmpty || words == kind.name || words == "Claude Code" || words.lowercased() == kind.executable ? nil : words
         }

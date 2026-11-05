@@ -13,7 +13,7 @@ case "latest":
         print("No feedback yet. Double-tap ` to record some.")
     }
 default:
-    MainActor.assumeIsolated {
+    MainActor.assumeIsolated { // top-level code runs on the main thread; AppKit wants the main actor
         let app = NSApplication.shared
         let delegate = AppDelegate()
         app.delegate = delegate

@@ -62,13 +62,14 @@ struct HookEvent {
 }
 
 /// Watches the events file and hands each new line to `onEvent` on the main thread.
+/// Unchecked: `partial` is only touched on the source's own serial queue.
 final class HookWatcher: @unchecked Sendable {
     private let handle: FileHandle
     private let source: DispatchSourceFileSystemObject
     private var partial = Data()
-    private let onEvent: @MainActor (HookEvent) -> Void
+    private let onEvent: @MainActor @Sendable (HookEvent) -> Void
 
-    init?(file: URL, onEvent: @escaping @MainActor (HookEvent) -> Void) {
+    init?(file: URL, onEvent: @escaping @MainActor @Sendable (HookEvent) -> Void) {
         guard let handle = try? FileHandle(forReadingFrom: file) else { return nil }
         self.handle = handle
         self.onEvent = onEvent
@@ -94,7 +95,7 @@ final class HookWatcher: @unchecked Sendable {
         }
         guard !events.isEmpty else { return }
         let onEvent = onEvent
-        DispatchQueue.main.async { MainActor.assumeIsolated { events.forEach(onEvent) } }
+        Task { @MainActor [events] in events.forEach(onEvent) }
     }
 
     func stop() {

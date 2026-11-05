@@ -30,7 +30,7 @@ final class BacktickTap {
         if !install() {
             // Keep trying quietly until Input Monitoring is allowed.
             retryTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
-                MainActor.assumeIsolated {
+                MainActor.assumeIsolated { // scheduled here, so it fires on the main run loop
                     guard let self, self.install() else { return }
                     self.retryTimer?.invalidate()
                     self.retryTimer = nil
@@ -51,6 +51,7 @@ final class BacktickTap {
             let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
             let repeated = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
             let modified = !event.flags.intersection(BacktickTap.modifiers).isEmpty
+            // The tap's run loop source is on the main run loop, so this is the main thread.
             MainActor.assumeIsolated { me.handle(type, keyCode: keyCode, repeated: repeated, modified: modified) }
             return Unmanaged.passUnretained(event)
         }, userInfo: refcon) else { return false }

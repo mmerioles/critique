@@ -169,12 +169,12 @@ final class DOMCapture: ObservableObject {
                 log("dom: listening on 127.0.0.1:\(Self.port) for the browser extension")
             case .failed(let error):
                 log("dom: listener failed: \(error.localizedDescription)")
-                DispatchQueue.main.async { MainActor.assumeIsolated { self?.restart() } }
+                Task { @MainActor [weak self] in self?.restart() }
             default: break
             }
         }
         listener.newConnectionHandler = { [weak self] connection in
-            DispatchQueue.main.async { MainActor.assumeIsolated { self?.accept(connection) } }
+            Task { @MainActor [weak self] in self?.accept(connection) }
         }
         self.listener = listener
         listener.start(queue: queue)
@@ -316,6 +316,7 @@ final class DOMCapture: ObservableObject {
     }
 
     /// One connected extension. Network callbacks run on the queue and hop to the main actor.
+    /// Unchecked: `browser` and `ready` are only touched on the main actor; NWConnection is thread-safe.
     private final class Link: @unchecked Sendable {
         enum Event { case ready, message(Data), closed }
 
@@ -323,9 +324,9 @@ final class DOMCapture: ObservableObject {
         // Main actor only.
         var browser: String?
         var ready = false
-        private let onEvent: @MainActor (Link, Event) -> Void
+        private let onEvent: @MainActor @Sendable (Link, Event) -> Void
 
-        init(_ connection: NWConnection, onEvent: @escaping @MainActor (Link, Event) -> Void) {
+        init(_ connection: NWConnection, onEvent: @escaping @MainActor @Sendable (Link, Event) -> Void) {
             self.connection = connection
             self.onEvent = onEvent
         }
@@ -376,7 +377,7 @@ final class DOMCapture: ObservableObject {
 
         private func emit(_ event: Event) {
             let onEvent = onEvent
-            DispatchQueue.main.async { MainActor.assumeIsolated { onEvent(self, event) } }
+            Task { @MainActor in onEvent(self, event) }
         }
     }
 }

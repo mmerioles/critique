@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /// Talks to Android phones with adb (wireless debugging or USB), and finds
 /// scrcpy for recording their screen and mic.
@@ -19,28 +20,28 @@ enum ADB {
 
     static let helperPackage = "dev.critique.mobile"
 
-    nonisolated(unsafe) private static var cachedAdb: String??
-    nonisolated(unsafe) private static var cachedScrcpy: String??
+    private static let cachedAdb = Mutex<String??>(nil)
+    private static let cachedScrcpy = Mutex<String??>(nil)
 
     /// adb from the Android SDK, ANDROID_HOME, or Homebrew.
     static var adbPath: String? {
-        if let cached = cachedAdb { return cached }
+        if let cached = cachedAdb.withLock({ $0 }) { return cached }
         let env = ProcessInfo.processInfo.environment
         let candidates = [env["ANDROID_HOME"], env["ANDROID_SDK_ROOT"], sdkRoot.path].compactMap { $0 }
             .map { "\($0)/platform-tools/adb" } + ["/opt/homebrew/bin/adb", "/usr/local/bin/adb"]
         let found = candidates.first { FileManager.default.isExecutableFile(atPath: $0) }
-        cachedAdb = .some(found)
+        cachedAdb.withLock { $0 = .some(found) }
         return found
     }
 
     static var scrcpyPath: String? {
-        if let cached = cachedScrcpy, cached != nil { return cached }
+        if let cached = cachedScrcpy.withLock({ $0 }), cached != nil { return cached }
         let found = ["/opt/homebrew/bin/scrcpy", "/usr/local/bin/scrcpy"].first { FileManager.default.isExecutableFile(atPath: $0) }
-        cachedScrcpy = .some(found)
+        cachedScrcpy.withLock { $0 = .some(found) }
         return found
     }
 
-    static func forgetScrcpy() { cachedScrcpy = nil }
+    static func forgetScrcpy() { cachedScrcpy.withLock { $0 = nil } }
 
     static var sdkRoot: URL {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Android/sdk")
@@ -118,6 +119,7 @@ enum ADB {
             return Result(status: process.terminationStatus, output: box.out, error: box.err)
     }
 
+    /// Unchecked: both buffers are behind the lock.
     private final class DataBox: @unchecked Sendable {
         private let lock = NSLock()
         private var outData = Data(), errData = Data()
@@ -169,15 +171,15 @@ enum ADB {
     /// on the local network, it can't find or reach your phone: "No route to host",
     /// and the phone waits forever after scanning the QR code. So before pairing,
     /// Critique restarts the server once, as its own.
-    nonisolated(unsafe) private static var ownsServer = false
+    private static let ownsServer = Mutex(false)
 
     static func takeOverServer() async {
-        guard !ownsServer else { return }
+        guard !ownsServer.withLock({ $0 }) else { return }
         await restartServer()
     }
 
     static func restartServer() async {
-        ownsServer = true
+        ownsServer.withLock { $0 = true }
         log("mobile: restarting the adb server so it runs as Critique's")
         _ = await adb(["kill-server"], timeout: 10)
         _ = await adb(["start-server"], timeout: 15)

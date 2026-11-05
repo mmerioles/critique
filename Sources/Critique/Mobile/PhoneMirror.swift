@@ -204,6 +204,7 @@ final class PhoneMirror: ObservableObject {
         let onClose: @MainActor () -> Void
         init(onClose: @escaping @MainActor () -> Void) { self.onClose = onClose }
         func windowWillClose(_ notification: Notification) {
+            // AppKit calls window delegates on the main thread.
             MainActor.assumeIsolated { onClose() }
         }
     }
@@ -232,6 +233,8 @@ final class PhoneMirror: ObservableObject {
 
 /// Reads raw H.264 from the forwarded socket, splits it into frames, and hands
 /// them to the display layer. Lives on its own queue.
+/// Unchecked: every mutable field is only touched on `queue`, where the connection's
+/// callbacks run (cancel() hops there too).
 final class MirrorStream: @unchecked Sendable {
     enum Event {
         case firstFrame(CGSize)
@@ -242,7 +245,7 @@ final class MirrorStream: @unchecked Sendable {
     private let connection: NWConnection
     private let queue = DispatchQueue(label: "dev.critique.mirror")
     private let display: MirrorDisplayView
-    private let onEvent: @MainActor (Event) -> Void
+    private let onEvent: @MainActor @Sendable (Event) -> Void
     private var buffer = Data()
     private var gotData = false
     private var cancelled = false
@@ -254,7 +257,7 @@ final class MirrorStream: @unchecked Sendable {
     private var frame: [Data] = []        // NAL units of the access unit being built
     private var sentFirst = false
 
-    init(port: UInt16, display: MirrorDisplayView, onEvent: @escaping @MainActor (Event) -> Void) {
+    init(port: UInt16, display: MirrorDisplayView, onEvent: @escaping @MainActor @Sendable (Event) -> Void) {
         connection = NWConnection(host: "127.0.0.1", port: NWEndpoint.Port(rawValue: port)!, using: .tcp)
         self.display = display
         self.onEvent = onEvent
@@ -297,7 +300,7 @@ final class MirrorStream: @unchecked Sendable {
         connection.cancel()
         let gotData = gotData
         let onEvent = onEvent
-        DispatchQueue.main.async { MainActor.assumeIsolated { onEvent(.closed(gotData: gotData)) } }
+        Task { @MainActor in onEvent(.closed(gotData: gotData)) }
     }
 
     /// Splits the Annex B byte stream on start codes. The last NAL stays in the
@@ -366,7 +369,7 @@ final class MirrorStream: @unchecked Sendable {
         let first = !sentFirst
         sentFirst = true
         let onEvent = onEvent
-        DispatchQueue.main.async { MainActor.assumeIsolated { onEvent(first ? .firstFrame(size) : .resized(size)) } }
+        Task { @MainActor in onEvent(first ? .firstFrame(size) : .resized(size)) }
     }
 
     /// Packs the collected slices as one AVCC sample (4-byte lengths) and shows it now.
@@ -413,8 +416,9 @@ final class MirrorStream: @unchecked Sendable {
 // MARK: - Display
 
 /// A layer-backed view holding the decoder/renderer. Safe to enqueue from the stream's queue.
-final class MirrorDisplayView: NSView, @unchecked Sendable {
-    private let videoLayer = AVSampleBufferDisplayLayer()
+final class MirrorDisplayView: NSView {
+    /// Unsafe: set up on the main thread; its renderer takes samples from any thread.
+    nonisolated(unsafe) private let videoLayer = AVSampleBufferDisplayLayer()
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -434,7 +438,7 @@ final class MirrorDisplayView: NSView, @unchecked Sendable {
         videoLayer.frame = bounds
     }
 
-    func enqueue(_ sample: CMSampleBuffer) {
+    nonisolated func enqueue(_ sample: CMSampleBuffer) {
         let renderer = videoLayer.sampleBufferRenderer
         if renderer.status == .failed { renderer.flush() }
         renderer.enqueue(sample)

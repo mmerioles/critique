@@ -3,11 +3,12 @@ import CoreGraphics
 import CoreText
 import Foundation
 import ImageIO
+import Synchronization
 import UniformTypeIdentifiers
 
 /// Turns a finished session into a folder in the inbox.
 enum FeedbackWriter {
-    struct Input: @unchecked Sendable {
+    struct Input: Sendable {
         let notes: String
         let shots: [Shot]
         /// Every word you said, with its time.
@@ -176,21 +177,20 @@ enum FeedbackWriter {
         generator.requestedTimeToleranceBefore = CMTime(seconds: 0.15, preferredTimescale: 600)
         generator.requestedTimeToleranceAfter = CMTime(seconds: 0.15, preferredTimescale: 600)
 
-        var results = [String?](repeating: nil, count: times.count)
-        let lock = NSLock()
+        let results = Mutex([String?](repeating: nil, count: times.count))
         let group = DispatchGroup()
-        let requested = times.map { NSValue(time: CMTime(seconds: $0, preferredTimescale: 600)) }
+        let requested = times.map { CMTime(seconds: $0, preferredTimescale: 600) }
         for _ in times { group.enter() }
-        generator.generateCGImagesAsynchronously(forTimes: requested) { requestedTime, image, _, _, _ in
+        generator.generateCGImagesAsynchronously(forTimes: requested.map { NSValue(time: $0) }) { requestedTime, image, _, _, _ in
             defer { group.leave() }
-            guard let image, let index = requested.firstIndex(where: { $0.timeValue == requestedTime }) else { return }
+            guard let image, let index = requested.firstIndex(of: requestedTime) else { return }
             let name = "frames/\(FeedbackRecord.clock(times[index], tenths: true).replacingOccurrences(of: ":", with: "-")).jpg"
             if (try? writeJPEG(image, to: dir.appendingPathComponent(name))) != nil {
-                lock.withLock { results[index] = name }
+                results.withLock { $0[index] = name }
             }
         }
         _ = group.wait(timeout: .now() + 15)
-        return results
+        return results.withLock { $0 }
     }
 
     /// The words you said while pointing at this shot (until the next one).

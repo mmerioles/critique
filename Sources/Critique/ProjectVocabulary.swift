@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import Synchronization
 
 /// Words from the project you're critiquing — component names, button labels,
 /// routes, branch names — so dictation hears "SignupModal" rather than "sign up model".
@@ -8,21 +9,21 @@ import Foundation
 /// source file changes. `current()` is what the speech recognizers get.
 enum ProjectVocabulary {
     /// The strings for the project last prepared. Cheap, safe from any thread.
-    static func current() -> [String] { lock.withLock { latest } }
+    static func current() -> [String] { state.withLock { $0.latest } }
 
     /// Builds the vocabulary for the active project in the background (a no-op
     /// when nothing changed since last time).
     static func prepare() {
         Task.detached(priority: .utility) {
             guard let record = Projects.activeRecord() else {
-                lock.withLock { latest = [] }
+                state.withLock { $0.latest = [] }
                 return
             }
             let path = record.path
-            guard lock.withLock({ inFlight.insert(path).inserted }) else { return }
-            defer { lock.withLock { _ = inFlight.remove(path) } }
+            guard state.withLock({ $0.inFlight.insert(path).inserted }) else { return }
+            defer { state.withLock { _ = $0.inFlight.remove(path) } }
             let strings = build(at: URL(fileURLWithPath: path), name: record.name)
-            lock.withLock { latest = strings }
+            state.withLock { $0.latest = strings }
         }
     }
 
@@ -33,11 +34,14 @@ enum ProjectVocabulary {
 
     // MARK: - Building
 
-    private static let lock = NSLock()
-    private static var cache: [String: (key: String, strings: [String])] = [:]
-    private static var latest: [String] = []
-    private static var inFlight = Set<String>()
-    private static var watching: AnyCancellable?
+    /// What the build tasks and callers share, behind one lock.
+    private struct State {
+        var cache: [String: (key: String, strings: [String])] = [:]
+        var latest: [String] = []
+        var inFlight = Set<String>()
+    }
+    private static let state = Mutex(State())
+    @MainActor private static var watching: AnyCancellable?
 
     private static let maxStrings = 150
     private static let maxLength = 40
@@ -78,7 +82,7 @@ enum ProjectVocabulary {
         let files = sourceFiles(in: root)
         let newest = files.map(\.modified).max() ?? .distantPast
         let key = "\(files.count)-\(newest.timeIntervalSince1970)"
-        if let cached = lock.withLock({ cache[root.path] }), cached.key == key { return cached.strings }
+        if let cached = state.withLock({ $0.cache[root.path] }), cached.key == key { return cached.strings }
 
         var terms = Terms()
         var bytes = 0
@@ -94,7 +98,7 @@ enum ProjectVocabulary {
         }
         branches(in: root, into: &terms)
         let strings = terms.ranked(limit: maxStrings)
-        lock.withLock { cache[root.path] = (key, strings) }
+        state.withLock { $0.cache[root.path] = (key, strings) }
         log("project vocabulary: \(strings.count) strings from \(read) files in \(name) (\(Int(Date().timeIntervalSince(started) * 1000)) ms)")
         return strings
     }

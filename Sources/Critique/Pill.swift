@@ -41,8 +41,11 @@ final class PillPanel: NSPanel {
     func hide() {
         NSAnimationContext.runAnimationGroup({ $0.duration = 0.2; animator().alphaValue = 0 },
                                              completionHandler: { [weak self] in
-            guard let self, self.alphaValue == 0 else { return }
-            self.orderOut(nil)
+            // AppKit runs animation completions on the main thread.
+            MainActor.assumeIsolated {
+                guard let self, self.alphaValue == 0 else { return }
+                self.orderOut(nil)
+            }
         })
     }
 

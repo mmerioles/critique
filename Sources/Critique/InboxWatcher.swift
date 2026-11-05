@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /// Wakes up when something lands in the inbox, so wait_for_feedback doesn't poll every
 /// half second. A DispatchSource watches the inbox folder (and any critique folder whose
@@ -59,23 +60,17 @@ enum InboxIndex {
         var project: String?
     }
 
-    private static var entries: [String: Entry] = [:]
-    private static let lock = NSLock()
+    private static let entries = Mutex<[String: Entry]>([:])
 
     /// nil while feedback.json is missing or still being written (it must decode).
     static func entry(for dir: URL) -> Entry? {
         let json = dir.appendingPathComponent("feedback.json")
         guard let modified = (try? FileManager.default.attributesOfItem(atPath: json.path))?[.modificationDate] as? Date else { return nil }
         let key = dir.lastPathComponent
-        lock.lock()
-        let hit = entries[key]
-        lock.unlock()
-        if let hit, hit.modified == modified { return hit }
+        if let hit = entries.withLock({ $0[key] }), hit.modified == modified { return hit }
         guard let record = Inbox.load(dir) else { return nil }
         let entry = Entry(modified: modified, project: record.project?.path)
-        lock.lock()
-        entries[key] = entry
-        lock.unlock()
+        entries.withLock { $0[key] = entry }
         return entry
     }
 }

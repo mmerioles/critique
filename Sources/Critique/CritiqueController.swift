@@ -96,8 +96,8 @@ final class CritiqueController {
         } }
         if Feature.screen.isOn { Task {
             do {
-                try await recorder.start(screen, excluding: [bar.windowNumber], microphone: Feature.voice.isOn,
-                                         limit: SessionLimit.current.seconds)
+                try await recorder.start(display: screen.displayID, size: screen.frame.size, excluding: [bar.windowNumber],
+                                         microphone: Feature.voice.isOn, limit: SessionLimit.current.seconds)
             } catch {
                 log("screen recording unavailable: \(error.localizedDescription)")
             }
@@ -299,9 +299,9 @@ final class CritiqueController {
                 let area = Self.topLeft(drawn.insetBy(dx: -12, dy: -12))
                 let found = await ElementLocator.elements(in: area, maxArea: maxArea)
                 var inside = found.map(\.label)
+                let hint = inside.first, backingScale = screen.backingScaleFactor
                 // On a web page, the browser extension adds selectors and component names for the agent.
-                async let web = DOMCapture.shared.snapshot(in: area, hint: inside.first, app: context.app,
-                                                           scale: screen.backingScaleFactor)
+                async let web = DOMCapture.shared.snapshot(in: area, hint: hint, app: context.app, scale: backingScale)
                 guard let image = try? await ScreenCapture.capture(screen), session.isActive else { return }
                 let dom = await web
                 let scale = CGFloat(image.width) / screen.frame.width

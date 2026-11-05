@@ -16,5 +16,5 @@ let package = Package(
                     dependencies: ["Critique"],
                     path: "Tests/CritiqueTests")
     ],
-    swiftLanguageModes: [.v5]
+    swiftLanguageModes: [.v6]
 )

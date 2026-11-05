@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /// The git projects on this Mac, and which one your critiques are for.
 ///
@@ -179,12 +180,12 @@ final class Projects: ObservableObject {
         // Read both pipes while git runs. Waiting first would stall git as soon as
         // it printed more than a pipe holds (64 KB), until the timeout.
         let group = DispatchGroup()
-        var outData = Data(), errData = Data()
+        let captured = Mutex<(out: Data, err: Data)>((Data(), Data()))
         for (pipe, isOut) in [(out, true), (err, false)] {
             group.enter()
             DispatchQueue.global(qos: .utility).async {
                 let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                if isOut { outData = data } else { errData = data }
+                captured.withLock { if isOut { $0.out = data } else { $0.err = data } }
                 group.leave()
             }
         }
@@ -198,6 +199,7 @@ final class Projects: ObservableObject {
             return (-1, "", "timed out")
         }
         process.waitUntilExit()
+        let (outData, errData) = captured.withLock { $0 }
         return (process.terminationStatus, String(decoding: outData, as: UTF8.self), String(decoding: errData, as: UTF8.self))
     }
 

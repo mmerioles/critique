@@ -38,6 +38,7 @@ enum LocalNetwork {
         }
     }
 
+    /// Resumes the continuation once, whichever callback gets there first. Unchecked: the field is behind a lock.
     private final class Once: @unchecked Sendable {
         private let lock = NSLock()
         private var continuation: CheckedContinuation<Bool, Never>?

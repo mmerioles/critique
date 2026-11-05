@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import Synchronization
 
 /// Claude Code with no terminal: `claude -p` kept running, with critiques going in
 /// as JSON user messages on stdin and its stream-json output read back for what
@@ -11,6 +12,9 @@ import SwiftUI
 /// id answers with a `result` of subtype `error_during_execution` and exits);
 /// `--add-dir` opens the projects folder; `/model <alias>` sent as a message
 /// switches the model in place.
+///
+/// Unchecked: `buffer` is only touched by stdout's readability handler (one call at a
+/// time), `stderrTail` is behind a lock, and Process and Pipe are thread-safe.
 final class HeadlessSession: @unchecked Sendable {
     /// What the stream said, boiled down to what Critique shows and tracks.
     enum Event {
@@ -25,16 +29,16 @@ final class HeadlessSession: @unchecked Sendable {
     private let process = Process()
     private let input = Pipe()
     private var buffer = Data()
-    private var stderrTail: [String] = []
+    private let stderrTail = Mutex<[String]>([])
     private let directory: String
-    private let onEvent: @MainActor (Event) -> Void
-    var onExit: (@MainActor (Int32, String) -> Void)?
+    private let onEvent: @MainActor @Sendable (Event) -> Void
+    var onExit: (@MainActor @Sendable (Int32, String) -> Void)?
 
     /// Writing to a pipe whose reader has died would otherwise kill Critique.
     private static let ignoreBrokenPipes: Void = { signal(SIGPIPE, SIG_IGN) }()
 
     init(arguments: [String], directory: String, environment: [String: String],
-         onEvent: @escaping @MainActor (Event) -> Void) {
+         onEvent: @escaping @MainActor @Sendable (Event) -> Void) {
         _ = Self.ignoreBrokenPipes
         self.directory = directory
         self.onEvent = onEvent
@@ -57,12 +61,12 @@ final class HeadlessSession: @unchecked Sendable {
             let data = handle.availableData
             guard let self, !data.isEmpty else { handle.readabilityHandler = nil; return }
             let lines = String(decoding: data, as: UTF8.self).split(separator: "\n").map(String.init)
-            self.stderrTail = Array((self.stderrTail + lines).suffix(5))
+            self.stderrTail.withLock { $0 = Array(($0 + lines).suffix(5)) }
         }
         process.terminationHandler = { [weak self] p in
             let status = p.terminationStatus
-            let tail = self?.stderrTail.joined(separator: " · ") ?? ""
-            DispatchQueue.main.async { MainActor.assumeIsolated { self?.onExit?(status, tail) } }
+            let tail = self?.stderrTail.withLock { $0.joined(separator: " · ") } ?? ""
+            Task { @MainActor [weak self] in self?.onExit?(status, tail) }
         }
     }
 
@@ -103,7 +107,7 @@ final class HeadlessSession: @unchecked Sendable {
         }
         guard !events.isEmpty else { return }
         let onEvent = onEvent
-        DispatchQueue.main.async { MainActor.assumeIsolated { events.forEach(onEvent) } }
+        Task { @MainActor [events] in events.forEach(onEvent) }
     }
 
     private func parse(_ json: [String: Any]) -> [Event] {

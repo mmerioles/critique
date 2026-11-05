@@ -22,15 +22,16 @@ enum MCPServer {
     struct RPCError: Error {
         var code: Int
         var message: String
-        var data: [String: Any]? = nil
+        var data: [String: String]? = nil
     }
 
     static func run() -> Never {
         while let line = readLine() {
-            guard let data = line.data(using: .utf8),
-                  let message = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { continue }
-            // Tool calls may block (wait_for_feedback), so they run off the read loop.
-            work.async { handle(message) }
+            // Tool calls may block (wait_for_feedback), so messages are parsed and handled off the read loop.
+            work.async {
+                guard let message = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any] else { return }
+                handle(message)
+            }
         }
         exit(0)
     }
@@ -82,7 +83,7 @@ enum MCPServer {
         }
     }
 
-    private static let tools: [[String: Any]] = [
+    private static var tools: [[String: Any]] { [
         [
             "name": "get_feedback",
             "description": "Get UX feedback the user recorded with Critique: what they said while looking at their screen, plus screenshots with the parts they highlighted. "
@@ -125,7 +126,7 @@ enum MCPServer {
             "description": "List recent Critique feedback with ids, times, and whether it has been acknowledged.",
             "inputSchema": ["type": "object", "properties": [:]],
         ],
-    ]
+    ] }
 
     private static func call(_ name: String, _ args: [String: Any]) throws -> [String: Any] {
         let inline = args["inline_images"] as? Bool ?? true
