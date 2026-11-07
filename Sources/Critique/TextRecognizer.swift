@@ -1,5 +1,7 @@
 import AppKit
-import ScreenCaptureKit
+// @preconcurrency: SCShareableContent is only Sendable from the macOS 26 SDK on;
+// this keeps the macOS 15 SDK (Xcode 16, CI) building. It does nothing on newer SDKs.
+@preconcurrency import ScreenCaptureKit
 import Vision
 
 /// Reads the text in part of a screenshot with Vision OCR. Accessibility can't

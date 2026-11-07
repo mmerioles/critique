@@ -202,15 +202,18 @@ enum Thumbnails {
 
     static func image(_ url: URL, maxPixels: Int = 480) async -> NSImage? {
         if let hit = cache.object(forKey: url as NSURL) { return hit }
-        let image: NSImage? = await Task.detached(priority: .userInitiated) {
-            guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-                  let cg = CGImageSourceCreateThumbnailAtIndex(source, 0, [
-                      kCGImageSourceCreateThumbnailFromImageAlways: true,
-                      kCGImageSourceThumbnailMaxPixelSize: maxPixels,
-                  ] as CFDictionary) else { return nil }
-            return NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
+        // Decode off the main actor, but hand back the CGImage: NSImage is only
+        // Sendable from the macOS 26 SDK on, so it's made here instead.
+        let cg: CGImage? = await Task.detached(priority: .userInitiated) {
+            guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+            return CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceThumbnailMaxPixelSize: maxPixels,
+            ] as CFDictionary)
         }.value
-        if let image { cache.setObject(image, forKey: url as NSURL) }
+        guard let cg else { return nil }
+        let image = NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
+        cache.setObject(image, forKey: url as NSURL)
         return image
     }
 }

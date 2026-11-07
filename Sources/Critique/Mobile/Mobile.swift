@@ -1,4 +1,6 @@
-import AVFoundation
+// @preconcurrency: AVFoundation types are only Sendable from the macOS 26 SDK on;
+// this keeps the macOS 15 SDK (Xcode 16, CI) building. It does nothing on newer SDKs.
+@preconcurrency import AVFoundation
 import CoreGraphics
 import Foundation
 
