@@ -16,11 +16,14 @@ permissions:
 jobs:
   release:
     runs-on: macos-15
+    # Steps can't read secrets in `if:`; the job works out once whether signing is set up.
+    env:
+      SIGNING_CONFIGURED: ${{ secrets.MACOS_CERTIFICATE_P12 != '' }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Import the Developer ID certificate
-        if: ${{ secrets.MACOS_CERTIFICATE_P12 != '' }}
+        if: env.SIGNING_CONFIGURED == 'true'
         env:
           MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
           MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
@@ -58,7 +61,7 @@ jobs:
           codesign --display --entitlements - build/Critique.app
 
       - name: Notarize and staple the DMG
-        if: ${{ secrets.MACOS_CERTIFICATE_P12 != '' }}
+        if: env.SIGNING_CONFIGURED == 'true'
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
