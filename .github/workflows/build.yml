@@ -1,10 +1,8 @@
-# Makes sure the Mac app still builds and its tests pass.
+# Makes sure the Mac app still builds and its tests pass on pull requests.
+# Pushes to main get the same check from release.yml before it publishes.
 name: Build
 
 on:
-  push:
-    branches: [main]
-    paths-ignore: ["site/**", "**.md"]
   pull_request:
   workflow_dispatch:
 

@@ -1,4 +1,6 @@
-# Tag a version (git tag v0.2.0 && git push --tags) to publish a downloadable build.
+# Every code change on main publishes a downloadable build as a GitHub release.
+# The version is Info.plist's major.minor plus the next unused patch number
+# (0.2.0, 0.2.1, ...); bump CFBundleShortVersionString to start a new minor or major.
 #
 # With the signing secrets set (see "Releasing" in README.md) the DMG is signed with
 # a Developer ID certificate, notarized and stapled, so it opens without Gatekeeper
@@ -7,11 +9,17 @@ name: Release
 
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+    paths-ignore: ["site/**", "**.md"]
   workflow_dispatch:
 
 permissions:
   contents: write
+
+# One release at a time, in push order, so two pushes never claim the same version.
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   release:
@@ -21,6 +29,22 @@ jobs:
       SIGNING_CONFIGURED: ${{ secrets.MACOS_CERTIFICATE_P12 != '' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # tags, to find the last released version
+
+      - name: Pick the version
+        run: |
+          set -euo pipefail
+          BASE="$(plutil -extract CFBundleShortVersionString raw Resources/Info.plist)"
+          MAJMIN="${BASE%.*}"
+          NEXT="${BASE##*.}"
+          LAST="$(git tag -l "v$MAJMIN.*" | sed "s/^v$MAJMIN\.//" | grep -E '^[0-9]+$' | sort -n | tail -1 || true)"
+          if [ -n "$LAST" ] && [ "$((LAST + 1))" -gt "$NEXT" ]; then NEXT=$((LAST + 1)); fi
+          echo "VERSION=$MAJMIN.$NEXT" >> "$GITHUB_ENV"
+          echo "Releasing $MAJMIN.$NEXT (build $GITHUB_RUN_NUMBER)"
+
+      - name: Run the tests
+        run: swift test
 
       - name: Import the Developer ID certificate
         if: env.SIGNING_CONFIGURED == 'true'
@@ -52,7 +76,7 @@ jobs:
 
       - name: Build the DMG
         # SIGN_ID is the Developer ID identity from the step above, or "-" (ad-hoc) without secrets.
-        run: make dmg SIGN_ID="${SIGN_ID:--}"
+        run: make dmg SIGN_ID="${SIGN_ID:--}" VERSION="$VERSION" BUILD="$GITHUB_RUN_NUMBER"
 
       - name: Check the signature
         if: ${{ env.SIGN_ID != '' }}
@@ -81,5 +105,8 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ env.VERSION }}
+          name: Critique ${{ env.VERSION }}
+          target_commitish: ${{ github.sha }}
           files: build/Critique.dmg
           generate_release_notes: true

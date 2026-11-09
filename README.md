@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.2.0-ff3b30" alt="Version 0.2.0">
+  <a href="https://github.com/mmerioles/critique/releases/latest"><img src="https://img.shields.io/github/v/release/mmerioles/critique?label=version&color=ff3b30" alt="Latest version"></a>
   <img src="https://img.shields.io/badge/platform-macOS%2015%2B-000000?logo=apple" alt="macOS 15+">
   <img src="https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white" alt="Swift 6">
   <img src="https://img.shields.io/badge/works%20with-Claude%20Code-D97757" alt="Works with Claude Code">
@@ -26,7 +26,7 @@
 
 ## Install
 
-Requires macOS 15+ and Xcode (or the Swift command line tools).
+Requires macOS 15+ and Xcode (or the Swift command line tools). On Xcode 26 or newer, also run `xcodebuild -downloadComponent metaltoolchain` once.
 
 ```sh
 make install     # builds, copies to /Applications, launches
@@ -110,7 +110,7 @@ The top of the tab shows your Claude plan usage, the 5-hour window and the week,
 
 ## Releasing
 
-Push a tag to publish a build: `git tag v0.2.0 && git push --tags`. The Release workflow builds the DMG and attaches it to a GitHub release. Bump `CFBundleShortVersionString` in `Resources/Info.plist` (and the badge above) first; the in-app update check compares it with the tag.
+Every push to `main` that changes code publishes a new release: the Release workflow runs the tests, builds the DMG and attaches it to a GitHub release, which the in-app update check then offers. Versions count up the patch number automatically (0.2.0, 0.2.1, …). To start a new minor or major version, change `CFBundleShortVersionString` in `Resources/Info.plist` (e.g. to `0.3.0`). Changes to only `site/` or Markdown files don't release.
 
 Without signing secrets the DMG is ad-hoc signed: it runs, but macOS warns on first open and resets the app's permissions on every build. Add these repository secrets and the workflow signs with your Developer ID, notarizes the DMG with Apple and staples the ticket, so it opens cleanly:
 
